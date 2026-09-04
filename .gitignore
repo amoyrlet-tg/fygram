@@ -1,0 +1,75 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+
+# Left over from when tsconfig.node.json emitted beside its source. Ignored
+# so an old checkout's copy cannot come back and shadow vite.config.ts.
+vite.config.js
+vite.config.d.ts
+
+# Rust build artifacts (Cargo.lock itself is fine/expected to be committed)
+src-tauri/target
+
+# Editor / agent directories and files
+.vscode/
+.claude
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local-only tooling: artist-parser model training set, gold data, artifacts.
+# Never published.
+tools/
+
+# Scratch screenshots dropped in the root (README shots live in docs/screenshots)
+/montage.png
+/*.local.png
+
+# audio dropped into the repo while testing playback, never part of the app
+*.m4a
+*.mp3
+*.flac
+*.opus
+*.ogg
+*.wav
+*.aac
+
+# Anything that would sign a release or unlock an account. None of it has ever
+# been in the repo; these lines are here so it cannot start.
+*.jks
+*.keystore
+key.properties
+keystore.properties
+local.properties
+.env
+.env.*
+*.session
+*.session.bak
+api_credentials.json
+
+# The generated mobile projects. Their own sources are committed - MainActivity,
+# the media notification, the icons - but everything gradle and xcode build from
+# them is not; the nested .gitignore files inside gen/android draw that line.
+src-tauri/gen/apple/
+
+# Cross-built ffmpeg and the apks it ends up inside. Built by
+# packaging/ffmpeg/build-audio.sh and by `tauri android build`, never committed.
+/ffmpeg-android-*/
+/ffmpeg-prefix/
+*.apk
+*.aab

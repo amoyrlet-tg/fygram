@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- the disc the logo sits on, sampled from public/icon.png -->
+    <color name="ic_launcher_background">#1A2735</color>
+</resources>

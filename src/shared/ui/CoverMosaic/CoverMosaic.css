@@ -1,0 +1,32 @@
+.cover-mosaic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.cover-mosaic > img {
+  width: 100%;
+  height: 100%;
+  /* cover, not contain: a tile has to fill its quarter or the grid shows gaps */
+  object-fit: cover;
+}
+
+.cover-mosaic.is-mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.cover-mosaic.is-mosaic > img {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}

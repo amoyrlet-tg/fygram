@@ -1,0 +1,97 @@
+.welcome-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    opacity var(--duration-base) var(--ease-productive),
+    transform var(--duration-base) var(--ease-productive);
+}
+.welcome-screen.is-closing {
+  opacity: 0;
+  transform: scale(0.98);
+  pointer-events: none;
+}
+
+.welcome-center {
+  position: relative;
+  z-index: 1;
+  height: 33.3vh;
+  min-height: 140px;
+  max-width: min(58vh, 480px, 90vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-base);
+  text-align: center;
+  animation: welcome-content-in 0.6s var(--ease-decelerate) both;
+}
+
+.welcome-greeting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-base);
+  text-align: left;
+}
+
+.welcome-kaomoji {
+  flex-shrink: 0;
+  width: 13ch;
+  display: inline-flex;
+  justify-content: flex-end;
+  overflow: visible;
+  font-family: "Courier New", var(--font-emoji), monospace;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--text-dim);
+  transform: translateY(1px);
+  white-space: nowrap;
+}
+
+.welcome-greeting-text {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.welcome-hint {
+  font-size: 12.5px;
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.welcome-hint.is-visible {
+  opacity: 1;
+}
+
+@keyframes welcome-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 560px) {
+  .welcome-center {
+    max-width: calc(100% - 48px);
+  }
+  .welcome-greeting-text {
+    font-size: 18px;
+  }
+  .welcome-kaomoji {
+    font-size: 21px;
+  }
+}

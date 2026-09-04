@@ -1,0 +1,67 @@
+.language-picker-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+}
+
+.language-picker-caption {
+  font-size: 13px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+.language-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 160px);
+  gap: 14px;
+}
+
+.language-picker-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px;
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-short) ease,
+    background var(--duration-short) ease,
+    transform var(--duration-short) ease;
+}
+.language-picker-option:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  transform: translateY(-2px);
+}
+
+.language-picker-option.is-suggested {
+  border-color: var(--accent-base, var(--blue));
+}
+
+.language-picker-flag {
+  width: 40px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 420px) {
+  .language-picker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: calc(100% - 48px);
+    max-width: 340px;
+  }
+}

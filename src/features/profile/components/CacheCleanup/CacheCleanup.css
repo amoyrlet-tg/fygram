@@ -1,0 +1,254 @@
+.storage-modal {
+  /* wider than a normal dialog; the height is the shared one, because a vh
+     figure here would be measured against the whole screen and ignore both the
+     system bars and an open keyboard */
+  width: min(880px, 100%);
+}
+
+.storage-modal .modal-body {
+  gap: var(--spacing-base);
+  padding: var(--spacing-looser) var(--spacing-looser);
+}
+
+.storage-working {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-tighter-2);
+  padding: var(--spacing-looser) 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.storage-section + .storage-section {
+  margin-top: var(--spacing-tighter-2);
+}
+
+.storage-section-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: var(--spacing-tighter-3);
+}
+
+.storage-path {
+  padding: var(--spacing-tighter-2) var(--spacing-tighter);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  font-family: ui-monospace, SFMono-Regular, Menlo, var(--font-emoji), monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.storage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-tighter-3);
+  margin-top: var(--spacing-tighter-3);
+}
+
+.storage-keep-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-base);
+}
+
+.storage-keep-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: var(--spacing-tighter-4);
+}
+
+.storage-keep-column {
+  min-width: 0;
+}
+
+.storage-keep-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--spacing-tighter-3);
+  min-height: 96px;
+  max-height: clamp(200px, 34vh, 340px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.storage-orphans {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-tighter-3);
+  margin-top: var(--spacing-tighter-2);
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.storage-preview {
+  margin-top: var(--spacing-tighter-2);
+  padding: var(--spacing-tighter) var(--spacing-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+}
+
+.storage-preview-headline {
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: var(--spacing-tighter-5);
+}
+
+@media (max-width: 720px) {
+  .storage-modal {
+    width: 100%;
+  }
+
+  .storage-modal .modal-body {
+    padding: var(--spacing-tighter) var(--spacing-base);
+  }
+
+  .storage-keep-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* On a narrow window the two lists cover almost the whole dialog, and
+     `overscroll-behavior: contain` stops a drag over them from reaching the
+     body underneath - so there is nowhere left to grab to scroll the dialog
+     itself. Let them grow to their content and leave the scrolling to the one
+     container that should be doing it. */
+  .storage-keep-list {
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+.storage-keep-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-tighter-3);
+  margin-bottom: var(--spacing-tighter-4);
+}
+
+.storage-keep-count {
+  margin-left: var(--spacing-tighter-4);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.storage-keep-bulk {
+  display: flex;
+  gap: var(--spacing-tighter-4);
+}
+
+.storage-keep-bulk button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.storage-keep-bulk button:hover {
+  color: var(--text);
+}
+
+.keep-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-tighter-2);
+  width: 100%;
+  padding: var(--spacing-tighter-3) var(--spacing-tighter-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 120ms var(--ease-out),
+    color 120ms var(--ease-out);
+}
+
+.keep-row:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.keep-row.is-on {
+  background: var(--blue-soft);
+  border-color: color-mix(in srgb, var(--blue) 40%, transparent);
+  color: var(--text);
+}
+
+.keep-row-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated-2);
+  color: var(--text-faint);
+  overflow: hidden;
+}
+
+.keep-row.is-on .keep-row-art {
+  color: var(--blue);
+}
+
+.keep-row-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.keep-row-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.keep-row-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.keep-row-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--bg);
+}
+
+.keep-row.is-on .keep-row-check {
+  border-color: var(--blue);
+  background: var(--blue);
+}

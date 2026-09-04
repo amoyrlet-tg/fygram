@@ -1,0 +1,105 @@
+.sync-dialog {
+  width: min(460px, 100%);
+}
+
+/* layout and scrolling come from .modal-body; this is only the spacing */
+.sync-dialog-body {
+  padding: 2px 20px 6px;
+}
+
+.sync-dialog-channel {
+  margin: 0 0 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.sync-dialog-group + .sync-dialog-group {
+  margin-top: 18px;
+}
+.sync-dialog-legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.sync-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 13px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  transition:
+    border-color var(--duration-shortest) ease,
+    background var(--duration-shortest) ease;
+}
+.sync-choice + .sync-choice {
+  margin-top: 8px;
+}
+.sync-choice:hover {
+  background: var(--bg-hover);
+}
+.sync-choice.is-active {
+  border-color: color-mix(in srgb, var(--accent-base) 70%, transparent);
+  background: color-mix(in srgb, var(--accent-base) 10%, transparent);
+}
+
+.sync-choice-mark {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  transition:
+    border-color var(--duration-shortest) ease,
+    box-shadow var(--duration-shortest) ease;
+}
+.sync-choice.is-active .sync-choice-mark {
+  border-color: var(--accent-base);
+  box-shadow: inset 0 0 0 3.5px var(--accent-base);
+}
+
+.sync-choice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.sync-choice-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.sync-choice-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+.sync-choice-note {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-faint);
+}
+
+.sync-dialog-footer {
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.sync-dialog-note {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}

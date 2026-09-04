@@ -1,0 +1,3 @@
+ALTER TABLE playlist_tracks ADD COLUMN added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE playlists ADD COLUMN telegram_sync_message_id INTEGER;

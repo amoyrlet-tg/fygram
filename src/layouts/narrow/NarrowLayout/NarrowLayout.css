@@ -1,0 +1,134 @@
+.mobile-shell {
+  position: relative;
+  height: var(--app-height);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.mobile-shell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -20%;
+  right: -20%;
+  height: 320px;
+  background: radial-gradient(
+    100% 100% at 50% 0%,
+    color-mix(in srgb, var(--blue) 20%, transparent),
+    transparent 72%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mobile-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.mobile-shell > .mobile-hero-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: flex-end;
+  padding: calc(var(--safe-top) + 10px) 14px 0 0;
+  pointer-events: none;
+}
+.mobile-hero-actions .mobile-hero-profile-chip {
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--bg) 45%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.mobile-shell > .mobile-player {
+  position: fixed;
+  z-index: 210;
+}
+
+.mobile-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  padding: 0;
+}
+
+.mobile-bottom {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px calc(var(--safe-bottom) + 6px);
+  background: linear-gradient(
+    to top,
+    var(--bg) 62%,
+    color-mix(in srgb, var(--bg) 74%, transparent)
+  );
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+}
+
+.mobile-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+.mobile-nav-btn {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+  color: var(--text-faint);
+  padding: 7px 0 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color 0.18s ease;
+}
+.mobile-nav-btn::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 52px;
+  height: 30px;
+  border-radius: 12px;
+  background: var(--blue-soft);
+  transform: translateX(-50%) scaleX(0.55);
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    transform 0.24s cubic-bezier(0.2, 0.8, 0.3, 1.1);
+}
+.mobile-nav-btn > * {
+  position: relative;
+}
+.mobile-nav-btn svg {
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+}
+.mobile-nav-btn.is-active {
+  color: var(--blue);
+}
+.mobile-nav-btn.is-active::before {
+  opacity: 1;
+  transform: translateX(-50%) scaleX(1);
+}
+.mobile-nav-btn.is-active svg {
+  transform: translateY(-1px) scale(1.06);
+}
+.mobile-nav-btn:active svg {
+  transform: scale(0.92);
+}

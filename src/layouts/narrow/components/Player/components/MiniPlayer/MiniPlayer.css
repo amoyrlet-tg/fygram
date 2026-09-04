@@ -1,0 +1,97 @@
+.mobile-miniplayer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 10px 8px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg-elevated-2) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  overflow: hidden;
+}
+
+.mobile-miniplayer::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.mobile-miniplayer-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 3px;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, var(--blue), var(--blue-hover));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--blue) 55%, transparent);
+  transition: width 0.25s linear;
+}
+
+.mobile-miniplayer-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+}
+.mobile-miniplayer-main:active .player-art {
+  transform: scale(0.94);
+}
+
+.mobile-miniplayer .player-art {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  color: #fff;
+  font-size: 17px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 0.14s ease;
+}
+.mobile-miniplayer .player-track-title {
+  font-size: 14.5px;
+}
+.mobile-miniplayer .player-track-artist {
+  font-size: 12.5px;
+}
+
+.mobile-miniplayer-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.mobile-miniplayer-controls .transport-play-btn {
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--blue) 45%, transparent);
+  transition: transform 0.12s ease;
+}
+.mobile-miniplayer-controls .transport-play-btn:active {
+  transform: scale(0.9);
+}
+.mobile-miniplayer-controls .icon-btn {
+  width: 42px;
+  height: 42px;
+  color: var(--text-dim);
+}
+.mobile-miniplayer-controls .icon-btn:active {
+  color: var(--text);
+}

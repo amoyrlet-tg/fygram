@@ -1,0 +1,172 @@
+.now-playing {
+  position: absolute;
+  /* the shell keeps a gap around its panels; this screen is meant to reach the
+     window edge, so it grows back over that padding */
+  inset: calc(var(--panel-gap) * -1);
+  border-radius: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* the tint is painted once; animating it would repaint the whole surface */
+  animation: now-playing-in var(--duration-base) var(--ease-out) both;
+}
+@keyframes now-playing-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.now-playing-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  flex: none;
+}
+.now-playing-album {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  /* the accent runs from strong at the top to the app background at the
+     bottom, and in the light theme white text vanished into it - the theme's
+     own text colour reads on both ends */
+  color: var(--text);
+  opacity: 0.85;
+}
+.now-playing-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--duration-shortest) var(--ease-out);
+}
+.now-playing-close:hover {
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.now-playing-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  padding: 0 24px 28px;
+}
+
+.now-playing-art {
+  width: min(46vh, 420px);
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  /* the whole picture, never a crop of it - covers are not always square */
+  object-fit: contain;
+  display: block;
+  box-shadow:
+    0 28px 60px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.now-playing-art-empty {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: min(18vh, 164px);
+  font-weight: 800;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.now-playing-text {
+  text-align: center;
+  max-width: min(90%, 560px);
+}
+.now-playing-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.now-playing-artist {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+@media (max-width: 720px) {
+  .now-playing-art {
+    width: min(64vw, 320px);
+  }
+  .now-playing-title {
+    font-size: 21px;
+  }
+}
+
+/* Track changes dissolve rather than blink: the outgoing layer stays put while
+   the incoming one fades in over it, then the old one is dropped. */
+.now-playing-bg,
+.now-playing-art-layer {
+  position: absolute;
+  inset: 0;
+}
+/* the painted layers are positioned, so without this they would sit on top of
+   the header and the artwork instead of behind them */
+.now-playing-bg {
+  z-index: 0;
+}
+.now-playing-top,
+.now-playing-stage {
+  position: relative;
+  z-index: 1;
+}
+.now-playing-bg-paint {
+  position: absolute;
+  inset: 0;
+}
+.now-playing-bg.is-entering,
+.now-playing-art-layer.is-entering {
+  animation: now-playing-dissolve 520ms var(--ease-out) both;
+}
+@keyframes now-playing-dissolve {
+  from {
+    opacity: 0;
+  }
+}
+
+.now-playing-art-frame {
+  position: relative;
+  width: min(46vh, 420px);
+  aspect-ratio: 1;
+  flex: none;
+}
+.now-playing-art-layer .now-playing-art {
+  width: 100%;
+  height: 100%;
+}
+.now-playing-art-layer.is-entering .now-playing-art {
+  animation: now-playing-art-in 520ms var(--ease-out) both;
+}
+@keyframes now-playing-art-in {
+  from {
+    transform: scale(1.03);
+  }
+}
+
+.now-playing-text {
+  animation: now-playing-text-in 420ms var(--ease-out) both;
+}
+@keyframes now-playing-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

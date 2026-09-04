@@ -1,0 +1,92 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  # The frontend has no native dependencies, so it answers in under a minute.
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+
+  # Rust formatting needs nothing built either.
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+        working-directory: src-tauri
+
+  lint:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            build-essential \
+            file \
+            libasound2-dev
+
+      # the same prefix and key the release build uses, so the two share a cache
+      - name: Cache ffmpeg
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-prefix
+          key: ffmpeg-audio-7.1.1-ubuntu-22.04-native-${{ hashFiles('packaging/ffmpeg/build-audio.sh') }}
+
+      - name: Install ffmpeg build tools
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: sudo apt-get install -y nasm
+
+      - name: Build ffmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: packaging/ffmpeg/build-audio.sh "$PWD/ffmpeg-prefix" native
+
+      - name: Point the build at ffmpeg
+        run: echo "FFMPEG_DIR=$PWD/ffmpeg-prefix" >> "$GITHUB_ENV"
+
+      # tauri-build wants the frontend where tauri.conf.json says it is
+      - run: npm ci
+      - run: npm run build
+
+      - run: cargo clippy --all-targets -- -D warnings
+        working-directory: src-tauri
+
+      - run: cargo test
+        working-directory: src-tauri

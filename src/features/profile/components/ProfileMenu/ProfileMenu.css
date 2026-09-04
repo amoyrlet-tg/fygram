@@ -1,0 +1,150 @@
+.profile-menu {
+  overflow-y: auto;
+  animation: profile-menu-in 0.22s var(--ease-decelerate) both;
+}
+.profile-menu.is-closing {
+  animation: profile-menu-out 0.16s var(--ease-productive) both;
+}
+@keyframes profile-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes profile-menu-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+}
+
+.profile-menu.profile-menu-full {
+  width: auto;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  animation: profile-menu-curtain-in 0.3s var(--ease-decelerate) both;
+}
+.profile-menu.profile-menu-full.is-closing {
+  animation: profile-menu-curtain-out 0.2s var(--ease-productive) both;
+}
+@keyframes profile-menu-curtain-in {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0% 0);
+  }
+}
+@keyframes profile-menu-curtain-out {
+  from {
+    clip-path: inset(0 0 0% 0);
+  }
+  to {
+    clip-path: inset(0 0 100% 0);
+  }
+}
+.profile-menu.profile-menu-full .profile-menu-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.profile-menu.profile-menu-full .profile-menu-col-divider {
+  display: none;
+}
+
+.profile-menu-backdrop {
+  /* Only the wash fades. Animating `backdrop-filter` recomposites the whole
+     screen on every frame, and the stutter is what made it look cheap. */
+  animation: profile-backdrop-in 0.22s var(--ease-productive) both;
+}
+.profile-menu-backdrop.is-closing {
+  animation: profile-backdrop-out 0.18s var(--ease-productive) both;
+}
+@keyframes profile-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes profile-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.profile-session-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-tighter);
+  margin-bottom: var(--spacing-tighter);
+  padding: var(--spacing-tighter-2) var(--spacing-tighter);
+  border: 1px solid color-mix(in srgb, var(--accent-yellow) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
+}
+
+.profile-session-alert-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-session-alert-text strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.profile-session-alert-text span {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-faint);
+}
+
+.profile-session-alert-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .profile-session-alert {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.profile-chip.has-alert {
+  position: relative;
+}
+
+.profile-chip.has-alert::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-yellow);
+  box-shadow: 0 0 0 2px var(--bg-elevated);
+}
+
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}

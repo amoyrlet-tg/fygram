@@ -1,0 +1,195 @@
+name: build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            rust_target: ""
+            ff_arch: native
+            args: "--bundles deb,appimage"
+          - os: windows-latest
+            rust_target: ""
+            ff_arch: msvc
+            args: "--bundles msi,nsis"
+          - os: windows-latest
+            rust_target: "i686-pc-windows-msvc"
+            ff_arch: msvc-x86
+            args: "--target i686-pc-windows-msvc --bundles msi,nsis"
+          - os: macos-14
+            rust_target: "aarch64-apple-darwin,x86_64-apple-darwin"
+            ff_arch: universal
+            args: "--target universal-apple-darwin --bundles dmg,app"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            build-essential \
+            file \
+            libasound2-dev
+
+      # fygram decodes through ffmpeg, built here for audio only - a few
+      # megabytes instead of the twenty a full build costs. Cached per platform:
+      # rebuilding it on every run would add five minutes for nothing.
+      - name: Cache ffmpeg
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-prefix
+          # rust_target carries a comma on macos and cache keys may not contain one
+          key: ffmpeg-audio-7.1.1-${{ matrix.os }}-${{ matrix.ff_arch }}-${{ hashFiles('packaging/ffmpeg/build-audio.sh') }}
+
+      - name: Install ffmpeg build tools (linux)
+        if: matrix.os == 'ubuntu-22.04' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: sudo apt-get install -y nasm
+
+      - name: Install ffmpeg build tools (macos)
+        if: matrix.os == 'macos-14' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: brew install nasm
+
+      - name: Build ffmpeg (unix)
+        if: matrix.os != 'windows-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: packaging/ffmpeg/build-audio.sh "$PWD/ffmpeg-prefix" "${{ matrix.ff_arch }}"
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: matrix.os == 'windows-latest'
+        with:
+          arch: ${{ matrix.rust_target == 'i686-pc-windows-msvc' && 'x86' || 'x64' }}
+
+      - uses: msys2/setup-msys2@v2
+        if: matrix.os == 'windows-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          install: make nasm diffutils pkgconf
+
+      - name: Build ffmpeg (windows)
+        if: matrix.os == 'windows-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: packaging/ffmpeg/build-audio.sh "$(pwd)/ffmpeg-prefix" "${{ matrix.ff_arch }}"
+
+      # cl.exe cannot read the /d/a/... form a bash shell reports on windows,
+      # so the path goes over in its native shape
+      - name: Point the build at ffmpeg (windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: echo "FFMPEG_DIR=${{ github.workspace }}\ffmpeg-prefix" >> $env:GITHUB_ENV
+
+      - name: Point the build at ffmpeg (unix)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: echo "FFMPEG_DIR=$PWD/ffmpeg-prefix" >> "$GITHUB_ENV"
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: fygram ${{ github.ref_name }}
+          releaseDraft: true
+          releaseBody: "Automated build."
+          args: ${{ matrix.args }}
+
+  arch:
+    needs: build
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm --needed \
+            git base-devel rust nodejs npm \
+            webkit2gtk-4.1 gtk3 libappindicator-gtk3 librsvg \
+            openssl alsa-lib \
+            curl wget file desktop-file-utils xdg-utils shared-mime-info \
+            nasm clang
+
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build ffmpeg (audio only)
+        run: |
+          packaging/ffmpeg/build-audio.sh "$PWD/ffmpeg-prefix" native
+          echo "FFMPEG_DIR=$PWD/ffmpeg-prefix" >> "$GITHUB_ENV"
+
+      - run: npm ci
+
+      - name: Build binary (Arch native)
+        run: npm run tauri build -- --no-bundle
+
+      - name: Bundle AppImage (best-effort)
+        continue-on-error: true
+        run: npm run tauri build -- --bundles appimage
+
+      - name: Collect Arch artifacts
+        run: |
+          mkdir -p out
+          cp src-tauri/target/release/fygram out/fygram-arch-x86_64
+          stage="fygram-arch"
+          mkdir -p "$stage"
+          cp src-tauri/target/release/fygram "$stage/fygram-arch-x86_64"
+          cp install.sh "$stage/install.sh"
+          chmod +x "$stage/install.sh"
+          cp src-tauri/icons/128x128.png "$stage/fygram.png"
+          tar -czf out/fygram-arch-installer.tar.gz "$stage"
+          for f in src-tauri/target/release/bundle/appimage/*.AppImage; do
+            [ -e "$f" ] || continue
+            base="$(basename "$f" .AppImage)"
+            cp "$f" "out/${base}-arch.AppImage"
+          done
+          ls -la out
+
+      - name: Attach Arch build to the release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: out/*
+
+      - name: Upload Arch build as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fygram-arch
+          path: out/*

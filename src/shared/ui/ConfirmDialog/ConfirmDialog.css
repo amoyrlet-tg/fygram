@@ -1,0 +1,14 @@
+.confirm-dialog {
+  width: min(360px, 100%);
+}
+/* layout and scrolling come from .modal-body; this is only the spacing */
+.confirm-dialog-body {
+  padding: 4px 20px 18px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.confirm-dialog .modal-footer {
+  justify-content: flex-end;
+  gap: 10px;
+}

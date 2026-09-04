@@ -1,0 +1,11 @@
+# Formatting is not a matter of taste here - see STYLE.md §12.
+# Only stable options live in this file; `group_imports` and
+# `imports_granularity` are nightly, so §3's grouping is on the author
+# (or on `cargo +nightly fmt`).
+
+edition = "2021"
+max_width = 100
+tab_spaces = 4
+newline_style = "Unix"
+use_field_init_shorthand = true
+use_try_shorthand = true
