@@ -8,6 +8,13 @@ on:
 permissions:
   contents: write
 
+env:
+  # grammers comes from git, and cargo's built-in fetcher hands back
+  # "SSL error: unknown error; class=Ssl (16)" often enough to fail a whole
+  # matrix at once. The git binary does not.
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  CARGO_NET_RETRY: "5"
+
 jobs:
   build:
     strategy:
