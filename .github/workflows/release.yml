@@ -126,6 +126,127 @@ jobs:
           releaseBody: "Automated build."
           args: ${{ matrix.args }}
 
+  # Android is built one ABI at a time: the ffmpeg prefix is per-architecture,
+  # and one FFMPEG_DIR cannot serve two of them.
+  android:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64
+            tauri_target: aarch64
+            rust_target: aarch64-linux-android
+            ff_arch: android-arm64
+            cc_triple: aarch64-linux-android
+          - abi: x86_64
+            tauri_target: x86_64
+            rust_target: x86_64-linux-android
+            ff_arch: android-x86_64
+            cc_triple: x86_64-linux-android
+    runs-on: ubuntu-22.04
+    env:
+      NDK_VERSION: 27.1.12297006
+      # matches minSdk in gen/android/app/build.gradle.kts; the linker will
+      # happily bind symbols the device does not have if these disagree
+      ANDROID_API: 26
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "ndk;${{ env.NDK_VERSION }}"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: android-${{ matrix.abi }}
+
+      - name: Cache ffmpeg
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-prefix
+          key: ffmpeg-audio-7.1.1-${{ matrix.ff_arch }}-${{ hashFiles('packaging/ffmpeg/build-audio.sh') }}
+
+      - name: Install ffmpeg build tools
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: sudo apt-get update && sudo apt-get install -y nasm
+
+      - name: Point the build at the NDK
+        run: |
+          ndk="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
+          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$ndk" >> "$GITHUB_ENV"
+
+      - name: Build ffmpeg (audio only)
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: packaging/ffmpeg/build-audio.sh "$PWD/ffmpeg-prefix" "${{ matrix.ff_arch }}"
+
+      # The `cc` crate looks for "<triple>-clang", but the NDK only ships the
+      # name with an api level in it. Without these, anything with C in it -
+      # aws-lc-sys behind reqwest's tls - fails to configure.
+      - name: Point the build at the toolchain
+        run: |
+          tc="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          triple="${{ matrix.cc_triple }}"
+          {
+            echo "FFMPEG_DIR=$PWD/ffmpeg-prefix"
+            echo "CC_${triple//-/_}=$tc/$triple$ANDROID_API-clang"
+            echo "CXX_${triple//-/_}=$tc/$triple$ANDROID_API-clang++"
+            echo "AR_${triple//-/_}=$tc/llvm-ar"
+            echo "CARGO_TARGET_$(echo "${triple//-/_}" | tr '[:lower:]' '[:upper:]')_LINKER=$tc/$triple$ANDROID_API-clang"
+          } >> "$GITHUB_ENV"
+
+      - run: npm ci
+
+      # gen/android carries the hand-written half - MainActivity, the media
+      # notification, the icons - but everything tauri regenerates is ignored,
+      # so it has to be put back before gradle sees the project.
+      - name: Restore the generated half of the android project
+        run: npx tauri android init --skip-targets-install
+
+      # Debug rather than release: signing needs a keystore, and an unsigned
+      # release APK cannot be installed at all.
+      - name: Build the APK
+        run: npx tauri android build --debug --target ${{ matrix.tauri_target }}
+
+      - name: Collect the APK
+        run: |
+          mkdir -p out
+          find src-tauri/gen/android/app/build/outputs -name '*.apk' -print0 |
+            while IFS= read -r -d "" f; do
+              cp "$f" "out/fygram-${{ matrix.abi }}-debug.apk"
+            done
+          ls -la out
+
+      - name: Upload the APK as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fygram-android-${{ matrix.abi }}
+          path: out/*.apk
+
+      - name: Attach the APK to the release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: out/*.apk
+
   arch:
     needs: build
     runs-on: ubuntu-latest
