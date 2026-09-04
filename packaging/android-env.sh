@@ -28,6 +28,12 @@ export CXX_x86_64_linux_android="$_TC/x86_64-linux-android24-clang++"
 export AR_x86_64_linux_android="$_TC/llvm-ar"
 export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$_TC/x86_64-linux-android24-clang"
 
+# ffmpeg-sys-next builds its bindings with bindgen, and bindgen reads the host's
+# headers unless it is told where the target's are. On Arch that silently
+# produces bindings for the host libc; on a Debian layout it fails outright with
+# "bits/libc-header-start.h file not found".
+export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot --target=x86_64-linux-android26"
+
 # Stripping and the C++ runtime that oboe needs live in src-tauri/.cargo/config.toml
 # instead - RUSTFLAGS in the environment would override that file wholesale.
 

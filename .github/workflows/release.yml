@@ -217,6 +217,12 @@ jobs:
             echo "CXX_${triple//-/_}=$tc/$triple$ANDROID_API-clang++"
             echo "AR_${triple//-/_}=$tc/llvm-ar"
             echo "CARGO_TARGET_$(echo "${triple//-/_}" | tr '[:lower:]' '[:upper:]')_LINKER=$tc/$triple$ANDROID_API-clang"
+            # ffmpeg-sys-next generates its bindings with bindgen, which reads
+            # the host's headers unless it is told where the target's are. It
+            # then fails on a Debian multiarch layout, and - worse - quietly
+            # succeeds on a distribution whose headers happen to sit where it
+            # looked, producing bindings for the wrong libc.
+            echo "BINDGEN_EXTRA_CLANG_ARGS=--sysroot=$(dirname "$tc")/sysroot --target=$triple$ANDROID_API"
           } >> "$GITHUB_ENV"
 
       - run: npm ci
