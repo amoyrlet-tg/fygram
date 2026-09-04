@@ -302,7 +302,6 @@ jobs:
           npm run tauri build -- --bundles appimage \
             || echo "no AppImage from the arch container; the ubuntu job builds one"
 
-
       - name: Collect Arch artifacts
         run: |
           mkdir -p out
