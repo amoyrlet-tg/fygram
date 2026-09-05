@@ -28,7 +28,7 @@ async fn mark_changed(state: &AppState, playlist_id: &str) -> Result<(), AppErro
 pub(crate) async fn queue_playlist(db: &sqlx::SqlitePool, playlist_id: &str) {
     let device = device_id(db).await;
     if let Err(err) = repository::touch_and_queue(db, playlist_id, &device).await {
-        eprintln!("sync: could not queue playlist {playlist_id}: {err}");
+        crate::log!("sync: could not queue playlist {playlist_id}: {err}");
     }
 }
 
@@ -82,7 +82,7 @@ pub(crate) async fn download(
     state.sync_cancel_flags.lock().await.remove(&playlist_id);
 
     result.map_err(|err| {
-        eprintln!("download_playlist({playlist_id}) failed: {err:#}");
+        crate::log!("download_playlist({playlist_id}) failed: {err:#}");
         AppError::Telegram(err)
     })
 }
@@ -173,7 +173,7 @@ pub(crate) async fn store_cover(
         let _ = tokio::fs::create_dir_all(parent).await;
     }
     if let Err(err) = tokio::fs::write(&dest, jpeg).await {
-        eprintln!("playlists: could not save the cover of {playlist_id}: {err}");
+        crate::log!("playlists: could not save the cover of {playlist_id}: {err}");
         return None;
     }
     drop_covers(root, playlist_id, Some(&dest)).await;

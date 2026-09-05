@@ -63,7 +63,7 @@ pub(crate) async fn save_api_credentials(
 pub(crate) async fn remove_api_credentials(app_dir: &Path) {
     if let Err(err) = tokio::fs::remove_file(api_credentials_path(app_dir)).await {
         if err.kind() != std::io::ErrorKind::NotFound {
-            eprintln!("db: failed to remove api_credentials.json: {err}");
+            crate::log!("db: failed to remove api_credentials.json: {err}");
         }
     }
 }

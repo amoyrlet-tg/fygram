@@ -171,7 +171,7 @@ impl PlayerHandle {
                                 let _ = reply.send(Ok(()));
                             }
                             Err(msg) => {
-                                eprintln!("audio: {msg}");
+                                crate::log!("audio: {msg}");
 
                                 if let Some(s) = sink.take() {
                                     s.stop();
@@ -240,7 +240,7 @@ impl PlayerHandle {
                                         stalled_since = None;
                                         let path = current_path_thread.lock().unwrap().clone();
                                         if let Some(path) = path {
-                                            eprintln!(
+                                            crate::log!(
                                                 "audio: output frozen at {position:.1}s - \
                                                  reopening on the current default device"
                                             );
@@ -256,7 +256,7 @@ impl PlayerHandle {
                                                     sink = Some(fresh);
                                                 }
                                                 Err(err) => {
-                                                    eprintln!("audio: could not move playback to another device: {err}");
+                                                    crate::log!("audio: could not move playback to another device: {err}");
                                                 }
                                             }
                                         }

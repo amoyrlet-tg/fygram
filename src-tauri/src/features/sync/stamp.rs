@@ -22,7 +22,7 @@ pub(crate) async fn device_id(db: &SqlitePool) -> String {
             }
             let fresh = uuid::Uuid::new_v4().to_string();
             if let Err(err) = settings::set(db, DEVICE_ID_KEY, &fresh).await {
-                eprintln!("sync: could not persist device_id: {err}");
+                crate::log!("sync: could not persist device_id: {err}");
             }
             fresh
         })

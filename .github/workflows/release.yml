@@ -233,19 +233,50 @@ jobs:
       - name: Restore the generated half of the android project
         run: npx tauri android init --skip-targets-install
 
-      # Debug rather than release: signing needs a keystore, and an unsigned
-      # release APK cannot be installed at all.
+      # Android refuses to install an unsigned package outright - it is not a
+      # warning that can be dismissed - so a release APK needs the real key. The
+      # keystore never touches the repository; it arrives from a secret and is
+      # removed again below.
+      - name: Unlock the release key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "no signing key configured; the APK will be unsigned" >&2
+            exit 0
+          fi
+          keystore="$RUNNER_TEMP/fygram-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore"
+          cat > src-tauri/gen/android/keystore.properties <<EOF
+          storeFile=$keystore
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
       - name: Build the APK
-        run: npx tauri android build --debug --target ${{ matrix.tauri_target }}
+        run: npx tauri android build --target ${{ matrix.tauri_target }}
 
       - name: Collect the APK
         run: |
           mkdir -p out
           find src-tauri/gen/android/app/build/outputs -name '*.apk' -print0 |
             while IFS= read -r -d "" f; do
-              cp "$f" "out/fygram-${{ matrix.abi }}-debug.apk"
+              cp "$f" "out/fygram-${{ matrix.abi }}.apk"
             done
           ls -la out
+
+      - name: Check the APK is signed
+        run: |
+          apksigner="$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | tail -1)"
+          "$apksigner" verify --print-certs "out/fygram-${{ matrix.abi }}.apk"
+
+      - name: Forget the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/fygram-release.jks" src-tauri/gen/android/keystore.properties
 
       - name: Upload the APK as a workflow artifact
         uses: actions/upload-artifact@v7

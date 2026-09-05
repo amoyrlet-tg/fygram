@@ -29,7 +29,7 @@ pub(crate) fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
     if let Err(err) =
         tauri::async_runtime::block_on(db::restore_api_credentials_if_missing(&db, &app_dir))
     {
-        eprintln!("db: failed to restore api credentials: {err:#}");
+        crate::log!("db: failed to restore api credentials: {err:#}");
     }
 
     let telegram = TelegramState::new();
@@ -46,7 +46,7 @@ pub(crate) fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
                 let session_path = app_dir.join("telegram.session");
                 match telegram.connect(session_path, api_id).await {
                     Ok(()) => auto_connected = true,
-                    Err(err) => eprintln!("telegram: failed to auto-connect: {err:#}"),
+                    Err(err) => crate::log!("telegram: failed to auto-connect: {err:#}"),
                 }
             }
         }

@@ -101,7 +101,7 @@ pub(crate) fn spawn_prefetch(app: AppHandle, track_id: String) {
         )
         .await
         {
-            eprintln!("prefetch_track({track_id}) failed: {err:#}");
+            crate::log!("prefetch_track({track_id}) failed: {err:#}");
         }
     });
 }

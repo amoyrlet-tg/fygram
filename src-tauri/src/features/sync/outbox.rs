@@ -25,7 +25,7 @@ pub(crate) async fn enqueue(db: &SqlitePool, entity: &str, entity_id: &str) {
     .execute(db)
     .await;
     if let Err(err) = result {
-        eprintln!("sync: could not queue {entity}/{entity_id}: {err}");
+        crate::log!("sync: could not queue {entity}/{entity_id}: {err}");
     }
 }
 

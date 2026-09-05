@@ -215,7 +215,7 @@ async fn run_channel_sync(
     state.sync_cancel_flags.lock().await.remove(&channel_id);
 
     if let Err(err) = &result {
-        eprintln!("sync_channel({channel_id}) failed: {err:#}");
+        crate::log!("sync_channel({channel_id}) failed: {err:#}");
 
         if channel_is_gone(&state.telegram, err) {
             crate::features::cloud::service::prune_channel(
@@ -225,7 +225,7 @@ async fn run_channel_sync(
             )
             .await;
         } else {
-            eprintln!(
+            crate::log!(
                 "sync_channel({channel_id}): keeping every track and file - the failure was \
                  ours, not the channel's"
             );
@@ -240,13 +240,13 @@ async fn run_channel_sync(
             Ok(resolved) if resolved > 0 => {
                 let _ = app.emit("library-changed", ());
             }
-            Err(err) => eprintln!("sync: resolving parked playlist tracks failed: {err:#}"),
+            Err(err) => crate::log!("sync: resolving parked playlist tracks failed: {err:#}"),
             _ => {}
         }
 
         // already talking to the channel, so the cheapest moment to ask
         if let Err(err) = refresh_rights(state, &app, &channel_id).await {
-            eprintln!("sync({channel_id}): could not refresh the edit rights: {err}");
+            crate::log!("sync({channel_id}): could not refresh the edit rights: {err}");
         }
 
         if let Ok(app_dir) = app.path().app_data_dir() {
@@ -273,7 +273,7 @@ fn spawn_channel_full_sync(app: AppHandle, channel_id: String) {
         if let Err(err) =
             run_channel_sync(&state, app.clone(), channel_id.clone(), SyncDepth::Full).await
         {
-            eprintln!("spawn_channel_full_sync({channel_id}) failed: {err}");
+            crate::log!("spawn_channel_full_sync({channel_id}) failed: {err}");
         }
     });
 }
@@ -317,7 +317,7 @@ pub(crate) async fn download(
     state.sync_cancel_flags.lock().await.remove(&channel_id);
 
     result.map_err(|err| {
-        eprintln!("download_channel({channel_id}) failed: {err:#}");
+        crate::log!("download_channel({channel_id}) failed: {err:#}");
         AppError::Telegram(err)
     })
 }

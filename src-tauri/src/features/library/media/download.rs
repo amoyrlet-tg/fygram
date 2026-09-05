@@ -69,7 +69,7 @@ async fn run_track_downloads(
         match res {
             Ok(_) => downloaded += 1,
             Err(err) => {
-                eprintln!("{log_label}: track {} failed: {err:#}", track.id);
+                crate::log!("{log_label}: track {} failed: {err:#}", track.id);
                 failed += 1;
             }
         }

@@ -85,7 +85,7 @@ impl TelegramState {
         if delete_original {
             if let Err(err) = client.delete_messages(peer, &[old_message_id]).await {
                 // untidy but recoverable; losing the new one would not be
-                eprintln!(
+                crate::log!(
                     "repost_track: posted {posted} but could not delete {old_message_id}: {err}"
                 );
             }

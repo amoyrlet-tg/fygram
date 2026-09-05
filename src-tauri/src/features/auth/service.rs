@@ -106,7 +106,7 @@ pub(crate) async fn save_credentials(
         .map_err(|e| AppError::Msg(e.to_string()))?;
 
     if let Err(err) = crate::shared::db::save_api_credentials(&app_dir, api_id, &api_hash).await {
-        eprintln!("save_telegram_credentials: failed to write api_credentials.json: {err:#}");
+        crate::log!("save_telegram_credentials: failed to write api_credentials.json: {err:#}");
     }
 
     let session_path = app_dir.join("telegram.session");
@@ -232,12 +232,12 @@ pub(crate) async fn logout(state: State<'_, AppState>, app: AppHandle) -> Result
 
     if let Err(err) = tokio::fs::remove_file(app_dir.join("telegram.session")).await {
         if err.kind() != std::io::ErrorKind::NotFound {
-            eprintln!("logout: failed to remove session: {err}");
+            crate::log!("logout: failed to remove session: {err}");
         }
     }
     if let Err(err) = tokio::fs::remove_dir_all(app_dir.join("media")).await {
         if err.kind() != std::io::ErrorKind::NotFound {
-            eprintln!("logout: failed to remove media dir: {err}");
+            crate::log!("logout: failed to remove media dir: {err}");
         }
     }
     if let Ok(mut entries) = tokio::fs::read_dir(&app_dir).await {

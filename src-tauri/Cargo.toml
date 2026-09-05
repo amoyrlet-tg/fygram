@@ -88,6 +88,15 @@ windows = { version = "0.62", features = [
     "Win32_System_Threading",
 ] }
 
+# What ships. `strip` is the big one on Android: the debug APK carried a
+# 500 MB library's worth of symbols, and none of it is any use on a phone.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "unwind"
+
 [profile.dev]
 debug-assertions = false
 overflow-checks = true

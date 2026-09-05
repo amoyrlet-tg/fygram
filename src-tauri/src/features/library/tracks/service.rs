@@ -53,7 +53,7 @@ pub(super) async fn update_track(
         album,
         cover_path,
     } = edit.trimmed();
-    eprintln!(
+    crate::log!(
         "update_track({track_id}): asked to set title={title:?} artist={artist:?} cover={cover_path:?}"
     );
 
@@ -105,7 +105,7 @@ pub(super) async fn update_track(
 
     // the cover lives inside the file, so it goes in before the upload
     if let Some(cover) = cover_path.as_deref().filter(|p| !p.trim().is_empty()) {
-        eprintln!("update_track({track_id}): writing {cover} into the file");
+        crate::log!("update_track({track_id}): writing {cover} into the file");
         media::covers::write_cover_into(Path::new(&track.file_path), Path::new(cover))
             .await
             .map_err(|err| AppError::Msg(format!("{err:#}")))?;
@@ -117,7 +117,7 @@ pub(super) async fn update_track(
     // an edit without a thumbnail strips the artwork the message already had
     let thumbnail = media::covers::telegram_thumbnail(Path::new(&track.file_path)).await;
 
-    eprintln!(
+    crate::log!(
         "update_track({track_id}): re-uploading {} to telegram",
         track.file_path
     );
@@ -139,11 +139,11 @@ pub(super) async fn update_track(
         .await;
 
     if let Err(err) = upload {
-        eprintln!("update_track({track_id}): telegram refused it: {err}");
+        crate::log!("update_track({track_id}): telegram refused it: {err}");
         // a lost right is remembered, a lost connection is not
         return Err(refusal(&state, &app, &track.channel_id, &err).await);
     }
-    eprintln!(
+    crate::log!(
         "update_track({track_id}): telegram accepted it in {:.1}s",
         started.elapsed().as_secs_f32()
     );
@@ -152,7 +152,7 @@ pub(super) async fn update_track(
     if let Err(err) =
         channels_repository::set_edit_right(&state.db, &track.channel_id, true, None).await
     {
-        eprintln!("update_track({track_id}): could not store the granted right: {err}");
+        crate::log!("update_track({track_id}): could not store the granted right: {err}");
     }
 
     repository::update_tags(&state.db, &track_id, &title, &artist, &album).await?;
@@ -230,7 +230,7 @@ pub(super) async fn repost_track(
         .await
         .map_err(AppError::Msg)?;
 
-    eprintln!(
+    crate::log!(
         "repost_track({track_id}): posting a replacement for message {}",
         track.tg_message_id
     );
@@ -254,11 +254,11 @@ pub(super) async fn repost_track(
     let posted = match posted {
         Ok(id) => id,
         Err(err) => {
-            eprintln!("repost_track({track_id}): telegram refused it: {err}");
+            crate::log!("repost_track({track_id}): telegram refused it: {err}");
             return Err(refusal(&state, &app, &track.channel_id, &err).await);
         }
     };
-    eprintln!("repost_track({track_id}): the track now lives in message {posted}");
+    crate::log!("repost_track({track_id}): the track now lives in message {posted}");
 
     // other devices point at tracks by (channel, message id), so this one
     // looks parked to them until `telegram_sync::resolve_pending_tracks` runs

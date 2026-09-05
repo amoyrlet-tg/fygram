@@ -236,7 +236,7 @@ pub(crate) async fn flush_pending(db: &SqlitePool) -> Result<usize, AppError> {
         let bytes = match tokio::fs::read(&file_path).await {
             Ok(bytes) => bytes,
             Err(err) => {
-                eprintln!("broadcast: cannot read {file_path}: {err}");
+                crate::log!("broadcast: cannot read {file_path}: {err}");
                 done(());
                 continue;
             }
@@ -259,13 +259,13 @@ pub(crate) async fn flush_pending(db: &SqlitePool) -> Result<usize, AppError> {
                     .lock()
                     .unwrap()
                     .insert((want.channel_id, want.message_id));
-                eprintln!(
+                crate::log!(
                     "broadcast: {} is larger than the server accepts — not retrying it",
                     file_path
                 );
             }
-            Ok(response) => eprintln!("broadcast: upload rejected with {}", response.status()),
-            Err(err) => eprintln!("broadcast: upload failed: {err}"),
+            Ok(response) => crate::log!("broadcast: upload rejected with {}", response.status()),
+            Err(err) => crate::log!("broadcast: upload failed: {err}"),
         }
 
         done(());

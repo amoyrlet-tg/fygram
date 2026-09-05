@@ -277,7 +277,7 @@ pub(crate) async fn set_sync_enabled(
 ) -> Result<(), AppError> {
     if !enabled {
         if let Err(err) = restore_hoisted(&state.db, &state.telegram).await {
-            eprintln!("profile: could not restore the profile music: {err}");
+            crate::log!("profile: could not restore the profile music: {err}");
         }
     }
 
@@ -300,7 +300,7 @@ pub(crate) fn spawn_set_now_playing(app: AppHandle, track_id: Option<String>) {
         };
 
         if let Err(err) = set_now_playing_inner(&state, track_id.clone()).await {
-            eprintln!("set_now_playing_track({track_id:?}) failed: {err}");
+            crate::log!("set_now_playing_track({track_id:?}) failed: {err}");
         }
     });
 }

@@ -41,7 +41,7 @@ fn teardown(app: &AppHandle) {
             .await
             .is_err()
         {
-            eprintln!(
+            crate::log!(
                 "shutdown: background tasks still running after {DRAIN_TIMEOUT:?} - exiting anyway"
             );
         }

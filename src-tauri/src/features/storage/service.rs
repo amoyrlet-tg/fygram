@@ -109,7 +109,7 @@ pub(crate) async fn ensure_layout(app: &AppHandle, db: &sqlx::SqlitePool) {
     match settings::get(db, LAYOUT_VERSION_KEY).await {
         Ok(Some(version)) if version == LAYOUT_VERSION => return,
         Err(err) => {
-            eprintln!("storage: could not read the layout version: {err}");
+            crate::log!("storage: could not read the layout version: {err}");
             return;
         }
         _ => {}
@@ -121,17 +121,17 @@ pub(crate) async fn ensure_layout(app: &AppHandle, db: &sqlx::SqlitePool) {
     match relocate(db, app, &root).await {
         Ok(result) => {
             if result.moved > 0 {
-                eprintln!(
+                crate::log!(
                     "storage: moved {} file(s) into the sharded tree",
                     result.moved
                 );
             }
             media_paths::prune_empty_dirs(&root).await;
             if let Err(err) = settings::set(db, LAYOUT_VERSION_KEY, LAYOUT_VERSION).await {
-                eprintln!("storage: could not record the layout version: {err}");
+                crate::log!("storage: could not record the layout version: {err}");
             }
         }
-        Err(err) => eprintln!("storage: could not rearrange the media folder: {err}"),
+        Err(err) => crate::log!("storage: could not rearrange the media folder: {err}"),
     }
 }
 
@@ -172,7 +172,7 @@ async fn relocate(
                 moved += 1;
             }
             Err(err) => {
-                eprintln!("storage: could not move {source:?}: {err:#}");
+                crate::log!("storage: could not move {source:?}: {err:#}");
                 failed += 1;
             }
         }

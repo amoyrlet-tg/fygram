@@ -110,9 +110,10 @@ async fn cycle(app: &AppHandle, last_pull: &mut Option<Instant>) -> Outcome {
             }
             Err(err) => {
                 let message = format!("{err:#}");
-                eprintln!(
+                crate::log!(
                     "sync: pushing {}/{} failed: {message}",
-                    job.entity, job.entity_id
+                    job.entity,
+                    job.entity_id
                 );
                 outbox::fail(&db, &job.entity, &job.entity_id, &message).await;
                 trouble = Some(message);
@@ -130,7 +131,7 @@ async fn cycle(app: &AppHandle, last_pull: &mut Option<Instant>) -> Outcome {
             }
             Err(err) => {
                 let message = format!("{err:#}");
-                eprintln!("sync: pull failed: {message}");
+                crate::log!("sync: pull failed: {message}");
                 trouble = Some(message);
             }
         }
@@ -187,7 +188,7 @@ async fn push(app: &AppHandle, state: &AppState, job: &Job) -> Result<bool> {
         }
         outbox::CHANNELS => reconcile_channels(app, state).await,
         other => {
-            eprintln!("sync: dropping unknown outbox entity {other:?}");
+            crate::log!("sync: dropping unknown outbox entity {other:?}");
             Ok(false)
         }
     }

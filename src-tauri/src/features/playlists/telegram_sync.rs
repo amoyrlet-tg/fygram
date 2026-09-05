@@ -336,7 +336,7 @@ async fn drop_tombstone(
 ) -> Result<()> {
     if let Some(message_id) = message_id {
         if let Err(err) = telegram.delete_saved_message(message_id as i32).await {
-            eprintln!("sync: could not delete the expired tombstone of {playlist_id}: {err:#}");
+            crate::log!("sync: could not delete the expired tombstone of {playlist_id}: {err:#}");
         }
     }
     let _ = sqlx::query("DELETE FROM playlist_pending_tracks WHERE playlist_id = ?")
@@ -368,7 +368,7 @@ pub(crate) async fn pull_playlists(
         let (doc, cover) = match unpack(&bytes) {
             Ok(unpacked) => unpacked,
             Err(err) => {
-                eprintln!("sync: skipping malformed playlist snapshot {message_id}: {err:#}");
+                crate::log!("sync: skipping malformed playlist snapshot {message_id}: {err:#}");
                 continue;
             }
         };
@@ -388,7 +388,7 @@ pub(crate) async fn pull_playlists(
     }
     for message_id in stale_messages {
         if let Err(err) = telegram.delete_saved_message(message_id).await {
-            eprintln!("sync: could not delete duplicate snapshot {message_id}: {err:#}");
+            crate::log!("sync: could not delete duplicate snapshot {message_id}: {err:#}");
         }
     }
 
@@ -396,7 +396,7 @@ pub(crate) async fn pull_playlists(
     for (message_id, doc, cover) in newest.into_values() {
         match apply_remote_playlist(db, media_root, message_id, &doc, cover.as_deref()).await {
             Ok(applied) => changed |= applied,
-            Err(err) => eprintln!("sync: could not apply {}: {err:#}", doc.playlist_id),
+            Err(err) => crate::log!("sync: could not apply {}: {err:#}", doc.playlist_id),
         }
     }
     Ok(changed)
@@ -616,7 +616,7 @@ pub(crate) async fn gc_tombstones(db: &SqlitePool, telegram: &TelegramState) {
 
     for (playlist_id, message_id) in expired {
         if let Err(err) = drop_tombstone(db, telegram, &playlist_id, message_id).await {
-            eprintln!("sync: could not retire the tombstone of {playlist_id}: {err:#}");
+            crate::log!("sync: could not retire the tombstone of {playlist_id}: {err:#}");
         }
     }
 }

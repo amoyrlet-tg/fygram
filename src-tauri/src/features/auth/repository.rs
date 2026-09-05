@@ -111,7 +111,7 @@ pub(crate) async fn wipe_database(db: &SqlitePool) {
             .execute(db)
             .await
         {
-            eprintln!("logout: failed to clear {table}: {err}");
+            crate::log!("logout: failed to clear {table}: {err}");
         }
     }
 }

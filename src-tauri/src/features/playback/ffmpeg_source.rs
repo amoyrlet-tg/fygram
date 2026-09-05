@@ -16,7 +16,7 @@ static INIT: Once = Once::new();
 fn init() {
     INIT.call_once(|| {
         if let Err(err) = ff::init() {
-            eprintln!("audio: ffmpeg failed to initialise: {err}");
+            crate::log!("audio: ffmpeg failed to initialise: {err}");
         }
         // ffmpeg is chatty on stderr about every quirk it forgives
         ff::log::set_level(ff::log::Level::Quiet);
@@ -110,7 +110,7 @@ impl FfmpegSource {
                     ) {
                         Ok(built) => self.resampler = Some(built),
                         Err(err) => {
-                            eprintln!("audio: cannot convert samples: {err}");
+                            crate::log!("audio: cannot convert samples: {err}");
                             return false;
                         }
                     }

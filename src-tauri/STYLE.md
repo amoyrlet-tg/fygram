@@ -319,13 +319,17 @@ llvm-objdump -d --start-address=0x... --stop-address=0x... libfygram_lib.so | he
 tdesktop logs through one facade (`LOG(("..."))`, `DEBUG_LOG(("..."))`), never
 raw stream writes, so every line is greppable and shaped the same.
 
-Here that facade is `eprintln!` with a fixed shape — `module: what happened`,
+Here that facade is `crate::log!` with a fixed shape — `module: what happened`,
 lowercase, no trailing period, the identifier that ties lines together first:
 
 ```rust
-eprintln!("telegram: failed to auto-connect: {err:#}");
-eprintln!("update_track({track_id}): re-uploading {} to telegram", track.file_path);
+crate::log!("telegram: failed to auto-connect: {err:#}");
+crate::log!("update_track({track_id}): re-uploading {} to telegram", track.file_path);
 ```
+
+`log!` compiles to nothing in a release build, format strings included — a
+shipped app narrates nothing. `eprintln!` belongs only inside the macro itself;
+tests may use `println!` freely.
 
 - Prefix is the module or the operation, always the same string within a file.
 - Log the decision and the cost, not the control flow: a retry, a fallback, a

@@ -22,7 +22,7 @@ pub(crate) fn spawn_cloud_restore(app: AppHandle) {
         )
         .await;
         if !matches!(probe, Ok(Ok(true))) {
-            eprintln!("cloud_sync: offline or not authorized - the sync engine will retry");
+            crate::log!("cloud_sync: offline or not authorized - the sync engine will retry");
             return;
         }
 
@@ -35,7 +35,7 @@ pub(crate) fn spawn_cloud_restore(app: AppHandle) {
         )
         .await
         {
-            eprintln!("cloud_sync::ensure_library_owner failed: {err:#}");
+            crate::log!("cloud_sync::ensure_library_owner failed: {err:#}");
             return;
         }
 

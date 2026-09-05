@@ -41,7 +41,7 @@ pub(crate) fn remember_app(app: AppHandle) {
 pub unsafe extern "system" fn JNI_OnLoad(vm: *mut RawJavaVM, _reserved: *mut c_void) -> jint {
     if let Err(err) = register(vm) {
         // returning an error version would stop the library loading at all
-        eprintln!("android: could not publish the java vm: {err}");
+        crate::log!("android: could not publish the java vm: {err}");
     }
     JNI_VERSION_1_6
 }

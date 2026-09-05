@@ -74,7 +74,7 @@ pub(crate) async fn broadcast_now_playing(
         let db = state.db.clone();
         tauri::async_runtime::spawn(async move {
             if let Err(err) = service::flush_pending(&db).await {
-                eprintln!("broadcast: flushing pending uploads failed: {err}");
+                crate::log!("broadcast: flushing pending uploads failed: {err}");
             }
         });
 

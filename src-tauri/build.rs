@@ -1,6 +1,19 @@
 fn main() {
+    mark_release_builds();
     link_cxx_runtime_on_android();
     tauri_build::build()
+}
+
+/// Tells the code which profile it is being built with, so `log!` can vanish
+/// from a shipped binary.
+///
+/// `debug_assertions` cannot answer this: the dev profile turns them off (see
+/// Cargo.toml), so it is false in both builds.
+fn mark_release_builds() {
+    println!("cargo:rustc-check-cfg=cfg(release_build)");
+    if std::env::var("PROFILE").as_deref() == Ok("release") {
+        println!("cargo:rustc-cfg=release_build");
+    }
 }
 
 /// Pulls in the C++ runtime and drops debug symbols on Android.

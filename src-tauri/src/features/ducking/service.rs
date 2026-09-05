@@ -76,7 +76,7 @@ async fn run(app: AppHandle) {
         let heard = match tokio::task::spawn_blocking(probe::telegram_is_playing).await {
             Ok(Probe::Known(heard)) => heard,
             Ok(Probe::Unsupported) => {
-                eprintln!(
+                crate::log!(
                     "ducking: nothing here can say which app is playing; leaving playback alone"
                 );
                 if reported {
@@ -85,7 +85,7 @@ async fn run(app: AppHandle) {
                 return;
             }
             Err(err) => {
-                eprintln!("ducking: probe task failed: {err}");
+                crate::log!("ducking: probe task failed: {err}");
                 continue;
             }
         };

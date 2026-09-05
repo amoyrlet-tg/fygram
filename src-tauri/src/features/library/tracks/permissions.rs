@@ -36,7 +36,7 @@ pub(super) async fn ensure_may_edit(
         None => match channels_service::refresh_rights(state, app, channel_id).await {
             Ok(fresh) => fresh,
             Err(err) => {
-                eprintln!("update_track: could not check the rights for {channel_id}: {err}");
+                crate::log!("update_track: could not check the rights for {channel_id}: {err}");
                 return Ok(());
             }
         },
@@ -68,7 +68,7 @@ pub(super) async fn refusal(
     if let Err(write_err) =
         channels_repository::set_edit_right(&state.db, channel_id, false, None).await
     {
-        eprintln!("update_track: could not store the refusal for {channel_id}: {write_err}");
+        crate::log!("update_track: could not store the refusal for {channel_id}: {write_err}");
     }
 
     let _ = app.emit(
@@ -97,7 +97,7 @@ pub(super) async fn ensure_may_repost(
 
     if stored.can_repost.is_none() {
         if let Err(err) = channels_service::refresh_rights(state, app, channel_id).await {
-            eprintln!("repost_track: could not check the rights for {channel_id}: {err}");
+            crate::log!("repost_track: could not check the rights for {channel_id}: {err}");
             return Ok(());
         }
     }

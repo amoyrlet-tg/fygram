@@ -122,7 +122,7 @@ impl FileSession {
         let loaded = read_session(&path).or_else(|| {
             let backup = backup_path(&path);
             let restored = read_session(&backup)?;
-            eprintln!("session: {path:?} was unusable - restoring from {backup:?}");
+            crate::log!("session: {path:?} was unusable - restoring from {backup:?}");
             Some(restored)
         });
 
@@ -152,7 +152,7 @@ impl FileSession {
             return;
         };
         if let Err(err) = crate::shared::atomic_file::atomic_write(&self.path, &bytes) {
-            eprintln!("session: failed to persist to {:?}: {err}", self.path);
+            crate::log!("session: failed to persist to {:?}: {err}", self.path);
             return;
         }
         inner.dirty = false;

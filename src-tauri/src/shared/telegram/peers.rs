@@ -170,7 +170,7 @@ impl TelegramState {
                 Ok(info) => return Ok(info),
                 // a rotated hash, or we were thrown out; the slower paths may
                 // still know
-                Err(err) => eprintln!("telegram: direct rights lookup for {channel_id}: {err}"),
+                Err(err) => crate::log!("telegram: direct rights lookup for {channel_id}: {err}"),
             }
         }
 

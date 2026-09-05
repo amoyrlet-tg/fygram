@@ -30,7 +30,7 @@ impl TelegramState {
         if let Some(document_id) = super::emoji_status::status_document_id(&me.raw) {
             match super::emoji_status::fetch(&client, avatar_dir, document_id).await {
                 Ok(status) => emoji_status = Some(status),
-                Err(err) => eprintln!("emoji status {document_id}: {err:#}"),
+                Err(err) => crate::log!("emoji status {document_id}: {err:#}"),
             }
         }
 
@@ -57,7 +57,7 @@ impl TelegramState {
         let photo = match current_channel_photo(&client, peer).await {
             Ok(photo) => photo,
             Err(err) => {
-                eprintln!("avatar: fetching channel {channel_id} photo failed: {err:#}");
+                crate::log!("avatar: fetching channel {channel_id} photo failed: {err:#}");
                 return cached_avatar_fallback(dir, &prefix, Some(&legacy)).await;
             }
         };
@@ -166,7 +166,7 @@ async fn refresh_user_avatar(client: &Client, dir: &Path, user_id: i64) -> Optio
     let photo = match current_profile_photo(client).await {
         Ok(photo) => photo,
         Err(err) => {
-            eprintln!("avatar: fetching current profile photo failed: {err:#}");
+            crate::log!("avatar: fetching current profile photo failed: {err:#}");
             return cached_avatar_fallback(dir, &prefix, Some(&legacy)).await;
         }
     };
@@ -225,13 +225,13 @@ async fn refresh_avatar(
             client
                 .download_media(&location, &dest)
                 .await
-                .inspect_err(|err| eprintln!("avatar: video download failed: {err:#}"))
+                .inspect_err(|err| crate::log!("avatar: video download failed: {err:#}"))
                 .is_ok()
         }
         None => client
             .download_media(&photo, &dest)
             .await
-            .inspect_err(|err| eprintln!("avatar: photo download failed: {err:#}"))
+            .inspect_err(|err| crate::log!("avatar: photo download failed: {err:#}"))
             .is_ok(),
     };
     if !downloaded {

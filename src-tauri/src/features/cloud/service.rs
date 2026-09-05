@@ -56,7 +56,7 @@ pub(crate) async fn ensure_library_owner(
     let stored_id = stored.and_then(|v| v.parse::<i64>().ok());
 
     if stored_id.is_some_and(|id| id != me.id) {
-        eprintln!(
+        crate::log!(
             "cloud_sync: local library belongs to a different account than the one now logged \
              in - wiping local library before restore"
         );
@@ -235,7 +235,7 @@ async fn load_remote_channels(telegram: &TelegramState) -> Result<(Option<i32>, 
         .filter_map(|(message_id, bytes)| match serde_json::from_slice(&bytes) {
             Ok(doc) => Some((message_id, doc)),
             Err(err) => {
-                eprintln!("cloud_sync: skipping malformed channel snapshot {message_id}: {err}");
+                crate::log!("cloud_sync: skipping malformed channel snapshot {message_id}: {err}");
                 None
             }
         })
@@ -247,7 +247,7 @@ async fn load_remote_channels(telegram: &TelegramState) -> Result<(Option<i32>, 
     };
     for (stale_id, _) in docs {
         if let Err(err) = telegram.delete_saved_message(stale_id).await {
-            eprintln!("cloud_sync: could not delete duplicate channel snapshot: {err:#}");
+            crate::log!("cloud_sync: could not delete duplicate channel snapshot: {err:#}");
         }
     }
 
@@ -360,7 +360,7 @@ pub(crate) async fn index_new_channels(app: &AppHandle, channel_ids: &[String]) 
                 continue;
             }
             Err(err) => {
-                eprintln!("cloud_sync: could not reload channel {id}: {err}");
+                crate::log!("cloud_sync: could not reload channel {id}: {err}");
                 notify_batch(app, true, total, position + 1);
                 continue;
             }
@@ -381,7 +381,7 @@ pub(crate) async fn index_new_channels(app: &AppHandle, channel_ids: &[String]) 
         )
         .await
         {
-            eprintln!(
+            crate::log!(
                 "cloud_sync: indexing channel {} failed: {err:#}",
                 channel.id
             );
@@ -392,7 +392,7 @@ pub(crate) async fn index_new_channels(app: &AppHandle, channel_ids: &[String]) 
         if let Err(err) =
             crate::features::playlists::telegram_sync::resolve_pending_tracks(&state.db, id).await
         {
-            eprintln!("cloud_sync: resolving parked playlist tracks failed: {err:#}");
+            crate::log!("cloud_sync: resolving parked playlist tracks failed: {err:#}");
         }
 
         if let Some(app_dir) = &app_dir {

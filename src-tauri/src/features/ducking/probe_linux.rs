@@ -81,7 +81,9 @@ pub(crate) fn watch(notify: Arc<Notify>) -> Watcher {
     {
         Ok(child) => child,
         Err(err) => {
-            eprintln!("ducking: `pactl subscribe` did not start ({err}); falling back to polling");
+            crate::log!(
+                "ducking: `pactl subscribe` did not start ({err}); falling back to polling"
+            );
             return Watcher::default();
         }
     };

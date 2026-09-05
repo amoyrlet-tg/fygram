@@ -238,7 +238,7 @@ pub(super) async fn download_with_retries(
                     Some(secs) => Duration::from_secs(secs.min(FLOOD_WAIT_CAP) as u64 + 1),
                     None => DOWNLOAD_RETRY_BACKOFF * attempt,
                 };
-                eprintln!(
+                crate::log!(
                     "ingest: download attempt {attempt}/{DOWNLOAD_RETRY_ATTEMPTS} failed, retrying in {:.1}s: {err:#}",
                     backoff.as_secs_f32()
                 );

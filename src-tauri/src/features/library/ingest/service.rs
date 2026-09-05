@@ -75,7 +75,7 @@ pub(crate) async fn sync_channel(
     let resolved_hash = peer.auth.hash();
     if resolved_hash != 0 && resolved_hash != channel.access_hash {
         if let Err(err) = repository::refresh_access_hash(db, &channel.id, resolved_hash).await {
-            eprintln!(
+            crate::log!(
                 "sync: could not store the fresh access_hash for {}: {err}",
                 channel.id
             );
@@ -135,7 +135,7 @@ pub(crate) async fn sync_channel(
             }
             Ok(IngestOutcome::NotAudio) => {}
             Err(err) => {
-                eprintln!("ingest: skipping message {}: {err:#}", message.id());
+                crate::log!("ingest: skipping message {}: {err:#}", message.id());
             }
         }
 

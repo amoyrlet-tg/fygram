@@ -3,6 +3,21 @@
 //! The shared state, the plugin wiring, and the table of what the frontend may
 //! call - which is the backend's entire public surface. Conventions: STYLE.md.
 
+/// The backend's only way of writing to the console.
+///
+/// Compiles to nothing in a release build: a shipped app should not narrate what
+/// it is doing to anyone watching the process, and the format strings go with
+/// it. `cfg!` rather than `#[cfg]` so the arguments still count as used and the
+/// line still has to typecheck either way.
+#[macro_export]
+macro_rules! log {
+    ($($arg:tt)*) => {{
+        if cfg!(not(release_build)) {
+            eprintln!($($arg)*);
+        }
+    }};
+}
+
 #[cfg(target_os = "android")]
 mod android;
 mod bootstrap;
