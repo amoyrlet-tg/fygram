@@ -40,3 +40,6 @@ export function useAmbientColor(path: string | null): string | null {
 
   return color;
 }
+
+/** For the memory log: how much this module is holding on to. */
+export const ambientCacheSize = () => ambientColorCache.size;

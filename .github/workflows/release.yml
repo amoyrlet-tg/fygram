@@ -3,7 +3,15 @@ name: build
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "What to build by hand"
+        type: choice
+        default: windows-x86
+        options:
+          - windows-x86
+          - all
 
 permissions:
   contents: write
@@ -37,6 +45,11 @@ jobs:
             rust_target: "aarch64-apple-darwin,x86_64-apple-darwin"
             ff_arch: universal
             args: "--target universal-apple-darwin --bundles dmg,app"
+    # a tag releases every platform; by hand, usually only one is wanted
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      inputs.only == 'all' ||
+      matrix.ff_arch == 'msvc-x86'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -149,6 +162,7 @@ jobs:
   # Android is built one ABI at a time: the ffmpeg prefix is per-architecture,
   # and one FFMPEG_DIR cannot serve two of them.
   android:
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     strategy:
       fail-fast: false
       matrix:
@@ -305,6 +319,7 @@ jobs:
           files: out/*.apk
 
   arch:
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     needs: build
     runs-on: ubuntu-latest
     container: archlinux:latest

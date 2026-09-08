@@ -74,3 +74,6 @@ export function useCoverTiles(trackIds: string[]): string[] {
   }
   return found;
 }
+
+/** For the memory log: how much this module is holding on to. */
+export const tileCacheSize = () => tiles.size;

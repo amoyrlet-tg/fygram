@@ -25,6 +25,7 @@ import { NarrowLayout, type NarrowTab } from "@/layouts/narrow/NarrowLayout";
 import { TrackTable } from "@/features/tracks/components/TrackTable";
 import { ChannelPicker } from "@/features/channels/components/ChannelPicker";
 import { useChannelRightsNotice } from "@/features/channels/useEditRights";
+import { useMemoryLog } from "@/features/diagnostics/useMemoryLog";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { LoadingOverlay } from "@/shared/ui/LoadingOverlay";
 
@@ -80,6 +81,7 @@ function LibraryContent() {
   }, [view]);
 
   useChannelRightsNotice();
+  useMemoryLog(allTracks.length);
 
   useEffect(() => {
     const unlisten = listen("library-changed", () => {

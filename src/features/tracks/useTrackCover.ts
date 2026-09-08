@@ -79,3 +79,10 @@ export function refreshCover(trackId: string) {
   version.set(trackId, (version.get(trackId) ?? 0) + 1);
   for (const watcher of watchers) watcher();
 }
+
+/** For the memory log: how much this module is holding on to. */
+export const coverCacheSizes = () => ({
+  covers: cache.size,
+  inFlight: inFlight.size,
+  versions: version.size,
+});

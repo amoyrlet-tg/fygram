@@ -28,6 +28,10 @@ export class LruMap<K, V> {
     }
   }
 
+  get size(): number {
+    return this.map.size;
+  }
+
   delete(key: K): void {
     this.map.delete(key);
   }

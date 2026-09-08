@@ -105,6 +105,7 @@ pub(crate) fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
     sync_engine::spawn(app.handle().clone());
 
     ducking::spawn(app.handle().clone());
+    crate::features::diagnostics::spawn(app.handle().clone());
 
     {
         let handle = app.handle().clone();

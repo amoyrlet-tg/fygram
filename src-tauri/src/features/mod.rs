@@ -3,6 +3,7 @@
 pub(crate) mod auth;
 pub(crate) mod broadcast;
 pub(crate) mod cloud;
+pub(crate) mod diagnostics;
 pub(crate) mod docs;
 pub(crate) mod ducking;
 pub(crate) mod host;

@@ -38,6 +38,7 @@ use shared::telegram::TelegramState;
 
 use features::auth::commands as auth_commands;
 use features::broadcast::commands as broadcast_commands;
+use features::diagnostics::commands as diagnostics_commands;
 use features::docs as docs_commands;
 use features::ducking::commands as ducking_commands;
 use features::host as host_commands;
@@ -125,6 +126,7 @@ pub fn run() {
             auth_commands::get_current_user,
             auth_commands::ambient_colour,
             auth_commands::logout,
+            diagnostics_commands::record_memory_sample,
             broadcast_commands::get_broadcast_config,
             broadcast_commands::set_broadcast_config,
             broadcast_commands::check_broadcast_target,
