@@ -27,29 +27,15 @@ jobs:
   build:
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            rust_target: ""
-            ff_arch: native
-            args: "--bundles deb,appimage"
-          - os: windows-latest
-            rust_target: ""
-            ff_arch: msvc
-            args: "--bundles msi,nsis"
-          - os: windows-latest
-            rust_target: "i686-pc-windows-msvc"
-            ff_arch: msvc-x86
-            args: "--target i686-pc-windows-msvc --bundles msi,nsis"
-          - os: macos-14
-            rust_target: "aarch64-apple-darwin,x86_64-apple-darwin"
-            ff_arch: universal
-            args: "--target universal-apple-darwin --bundles dmg,app"
-    # a tag releases every platform; by hand, usually only one is wanted
-    if: >-
-      github.event_name != 'workflow_dispatch' ||
-      inputs.only == 'all' ||
-      matrix.ff_arch == 'msvc-x86'
+      # The matrix is picked here rather than filtered per job: a job-level
+      # `if` cannot see `matrix`, so the choice has to be made before the
+      # jobs exist. A tag builds everything; by hand, Windows x86 alone.
+      matrix: >-
+        ${{ fromJSON(
+          (github.event_name == 'workflow_dispatch' && inputs.only != 'all')
+          && '{"include":[{"os":"windows-latest","rust_target":"i686-pc-windows-msvc","ff_arch":"msvc-x86","args":"--target i686-pc-windows-msvc --bundles msi,nsis"}]}'
+          || '{"include":[{"os":"ubuntu-22.04","rust_target":"","ff_arch":"native","args":"--bundles deb,appimage"},{"os":"windows-latest","rust_target":"","ff_arch":"msvc","args":"--bundles msi,nsis"},{"os":"windows-latest","rust_target":"i686-pc-windows-msvc","ff_arch":"msvc-x86","args":"--target i686-pc-windows-msvc --bundles msi,nsis"},{"os":"macos-14","rust_target":"aarch64-apple-darwin,x86_64-apple-darwin","ff_arch":"universal","args":"--target universal-apple-darwin --bundles dmg,app"}]}'
+        ) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
