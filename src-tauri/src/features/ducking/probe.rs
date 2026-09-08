@@ -29,5 +29,10 @@ mod fallback {
 
 #[cfg(target_os = "linux")]
 pub(crate) const IDLE_POLL: std::time::Duration = std::time::Duration::from_secs(2);
+// Every probe here initialises COM, walks all audio sessions, and asks the
+// system for the full image path of the process behind each one. At 150ms that
+// was seven of those a second and around 60% of a core with nothing playing but
+// our own music. Voice messages open with a moment of near-silence anyway, so
+// half a second still ducks before there is anything to duck under.
 #[cfg(target_os = "windows")]
-pub(crate) const IDLE_POLL: std::time::Duration = std::time::Duration::from_millis(150);
+pub(crate) const IDLE_POLL: std::time::Duration = std::time::Duration::from_millis(500);
