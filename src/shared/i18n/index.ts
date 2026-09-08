@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type Lang = "ru" | "en" | "uk" | "be" | "kk";
 
@@ -1614,7 +1614,14 @@ const kk: Record<string, string> = {
 
 const dicts: Partial<Record<Lang, Record<string, string>>> = { ru, uk, be, kk };
 
+/**
+ * Stable per language: a fresh function every render made every effect that
+ * depends on it re-run, and the ones that subscribe to backend events tore
+ * down and re-registered their listener each time. Tauri keeps those in an
+ * array per event name, and a V8 backing store never shrinks when slots are
+ * freed - so an afternoon of playback grew it to megabytes.
+ */
 export function useT() {
   const { lang } = useLangStore();
-  return (key: string): string => dicts[lang]?.[key] ?? key;
+  return useCallback((key: string): string => dicts[lang]?.[key] ?? key, [lang]);
 }

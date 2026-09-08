@@ -578,7 +578,9 @@ export function usePlayer() {
   }, [advance]);
 
   const previous = useCallback(() => {
-    if (position > 3) {
+    // read through the ref: depending on `position` rebuilt this callback twice
+    // a second, and the media-transport listener re-subscribed with it
+    if (stateRef.current.position > 3) {
       playerApi.seekPlayback(0);
       applyPosition(0);
       beatRef.current(0);
@@ -587,7 +589,7 @@ export function usePlayer() {
     failStreakRef.current = 0;
     setPlaybackError(null);
     advance(-1);
-  }, [advance, position, applyPosition]);
+  }, [advance, applyPosition]);
 
   // The card Android draws in the notification shade. Its buttons arrive here
   // rather than in Rust because the queue lives here - see src/android.rs.
