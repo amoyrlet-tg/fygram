@@ -133,6 +133,19 @@ jobs:
           releaseBody: "Automated build."
           args: ${{ matrix.args }}
 
+      # A manual run has no tag, so tauri-action publishes nothing and the
+      # bundles would be thrown away with the runner. Keep them, so a branch
+      # can be installed and tested before it is worth a release.
+      - name: Keep the bundles of an untagged build
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: fygram-${{ matrix.ff_arch }}
+          path: |
+            src-tauri/target/release/bundle/**/*
+            src-tauri/target/*/release/bundle/**/*
+          if-no-files-found: warn
+
   # Android is built one ABI at a time: the ffmpeg prefix is per-architecture,
   # and one FFMPEG_DIR cannot serve two of them.
   android:
