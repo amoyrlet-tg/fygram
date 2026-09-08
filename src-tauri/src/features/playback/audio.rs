@@ -203,7 +203,6 @@ impl PlayerHandle {
                         if let Some(s) = sink.take() {
                             s.stop();
                         }
-                        output = None;
                         stalled_since = None;
                         *current_path_thread.lock().unwrap() = None;
                     }
@@ -211,7 +210,6 @@ impl PlayerHandle {
                         if let Some(s) = sink.take() {
                             s.stop();
                         }
-                        output = None;
                         stalled_since = None;
                         *current_path_thread.lock().unwrap() = None;
                     }
