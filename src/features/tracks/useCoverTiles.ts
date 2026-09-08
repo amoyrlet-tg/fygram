@@ -1,25 +1,25 @@
 import { useEffect, useReducer } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { LruMap } from "@/shared/lib/lruCache";
 import { tracksApi } from "./api";
-
 /**
  * Artwork for mosaics: many tracks per request, no palettes. A sidebar asks
  * about hundreds at once, and `useTrackCover` would decode every one of them.
+ * Capped so browsing many playlists/channels over a long session does not
+ * keep every tile's decoded image alive forever.
  */
-const tiles = new Map<string, string | null>();
+const TILES_LIMIT = 500;
+const tiles = new LruMap<string, string | null>(TILES_LIMIT);
 const watchers = new Set<() => void>();
 const pending = new Set<string>();
 let scheduled = false;
-
 function flush() {
   scheduled = false;
   const ids = Array.from(pending);
   pending.clear();
   if (ids.length === 0) return;
-
   // claimed before the answer arrives, so a second mosaic does not re-queue
   for (const id of ids) tiles.set(id, null);
-
   tracksApi
     .trackCoverPaths(ids)
     .then((found) => {
@@ -30,7 +30,6 @@ function flush() {
     })
     .catch(console.error);
 }
-
 function request(ids: string[]) {
   let added = false;
   for (const id of ids) {
@@ -42,12 +41,10 @@ function request(ids: string[]) {
   scheduled = true;
   queueMicrotask(flush);
 }
-
 /** The artwork of those of `trackIds` that have any, in the order given. */
 export function useCoverTiles(trackIds: string[]): string[] {
   const key = trackIds.join(",");
   const [version, bump] = useReducer((n: number) => n + 1, 0);
-
   useEffect(() => {
     const ids = key ? key.split(",") : [];
     if (ids.length === 0) return;
@@ -62,7 +59,6 @@ export function useCoverTiles(trackIds: string[]): string[] {
       watchers.delete(read);
     };
   }, [key]);
-
   // recomputed every render: memoising would mean depending on `version`,
   // which this never reads
   void version;

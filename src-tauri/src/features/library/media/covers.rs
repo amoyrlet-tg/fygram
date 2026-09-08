@@ -96,6 +96,147 @@ fn palette_of(bytes: &[u8]) -> Vec<String> {
         .collect()
 }
 
+/// The one colour a picture reads as, for tinting the page behind it.
+///
+/// This used to happen in the webview: the file crossed IPC as a base64 data
+/// URL, became an `Image`, and was drawn to a canvas only to read 48x48 pixels
+/// back out. Per cover that put a megabyte of string plus a full-size decoded
+/// bitmap into the renderer, and the renderer was left holding it.
+pub(crate) fn ambient_colour_of(bytes: &[u8]) -> Option<String> {
+    const SIDE: u32 = 48;
+
+    let image = image::load_from_memory(bytes).ok()?;
+    let small = image
+        .resize_exact(SIDE, SIDE, image::imageops::FilterType::Triangle)
+        .to_rgba8();
+
+    let (r, g, b) = dominant_colour(&small)?;
+    let [r, g, b] = boost_vividness(r, g, b);
+    Some(format!("{r}, {g}, {b}"))
+}
+
+fn saturation_of(r: f32, g: f32, b: f32) -> f32 {
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    if max <= 0.0 {
+        0.0
+    } else {
+        (max - min) / max
+    }
+}
+
+/// The heaviest bin of the picture, weighted towards saturated mid-tones: a
+/// plain average gives the same brown-grey for every cover.
+fn dominant_colour(image: &image::RgbaImage) -> Option<(f32, f32, f32)> {
+    #[derive(Default)]
+    struct Bin {
+        weight: f32,
+        r: f64,
+        g: f64,
+        b: f64,
+        n: u32,
+    }
+
+    let mut bins: std::collections::HashMap<u32, Bin> = std::collections::HashMap::new();
+    for pixel in image.pixels() {
+        let [r, g, b, alpha] = pixel.0;
+        if alpha < 200 {
+            continue;
+        }
+        let max = r.max(g).max(b);
+        if max < 60 || (r > 240 && g > 240 && b > 240) {
+            continue; // near-black and near-white say nothing about a cover
+        }
+
+        let key = ((r as u32 >> 4) << 8) | ((g as u32 >> 4) << 4) | (b as u32 >> 4);
+        let lightness = (max as f32 + r.min(g).min(b) as f32) / 510.0;
+        let slot = bins.entry(key).or_default();
+        slot.weight += (saturation_of(r as f32, g as f32, b as f32) + 0.1)
+            * (1.0 - (lightness - 0.5).abs() * 1.6).max(0.05);
+        slot.r += f64::from(r);
+        slot.g += f64::from(g);
+        slot.b += f64::from(b);
+        slot.n += 1;
+    }
+
+    let best = bins
+        .into_values()
+        .max_by(|a, b| a.weight.total_cmp(&b.weight))?;
+    let n = f64::from(best.n.max(1));
+    Some((
+        (best.r / n) as f32,
+        (best.g / n) as f32,
+        (best.b / n) as f32,
+    ))
+}
+
+/// Covers run dark and muddy more often than not, and a tint has to read
+/// against the page, so the pick is pushed towards something worth painting.
+fn boost_vividness(r: f32, g: f32, b: f32) -> [u8; 3] {
+    let (rn, gn, bn) = (r / 255.0, g / 255.0, b / 255.0);
+    let max = rn.max(gn).max(bn);
+    let min = rn.min(gn).min(bn);
+    let lightness = (max + min) / 2.0;
+
+    let mut hue = 0.0f32;
+    let mut saturation = 0.0f32;
+    if max != min {
+        let d = max - min;
+        saturation = if lightness > 0.5 {
+            d / (2.0 - max - min)
+        } else {
+            d / (max + min)
+        };
+        hue = if max == rn {
+            (gn - bn) / d + if gn < bn { 6.0 } else { 0.0 }
+        } else if max == gn {
+            (bn - rn) / d + 2.0
+        } else {
+            (rn - gn) / d + 4.0
+        };
+        hue /= 6.0;
+    }
+
+    let saturation = (saturation + 0.15).min(1.0);
+    let lightness = (lightness * 1.15).clamp(0.46, 0.6);
+
+    if saturation <= 0.0 {
+        let value = (lightness * 255.0).round() as u8;
+        return [value, value, value];
+    }
+
+    let q = if lightness < 0.5 {
+        lightness * (1.0 + saturation)
+    } else {
+        lightness + saturation - lightness * saturation
+    };
+    let p = 2.0 * lightness - q;
+    [
+        (hue_to_rgb(p, q, hue + 1.0 / 3.0) * 255.0).round() as u8,
+        (hue_to_rgb(p, q, hue) * 255.0).round() as u8,
+        (hue_to_rgb(p, q, hue - 1.0 / 3.0) * 255.0).round() as u8,
+    ]
+}
+
+fn hue_to_rgb(p: f32, q: f32, t: f32) -> f32 {
+    let t = if t < 0.0 {
+        t + 1.0
+    } else if t > 1.0 {
+        t - 1.0
+    } else {
+        t
+    };
+    if t < 1.0 / 6.0 {
+        p + (q - p) * 6.0 * t
+    } else if t < 1.0 / 2.0 {
+        q
+    } else if t < 2.0 / 3.0 {
+        p + (q - p) * (2.0 / 3.0 - t) * 6.0
+    } else {
+        p
+    }
+}
+
 /// Reads tags leniently: channel audio carries malformed metadata - a year that
 /// is not four digits - and lofty's default mode refuses the whole file over it.
 pub(super) fn read_tags(

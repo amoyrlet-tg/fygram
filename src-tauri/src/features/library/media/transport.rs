@@ -24,6 +24,11 @@ const DOWNLOAD_WORKERS: i64 = 8;
 // download shares one budget. Going wider than this only earned FLOOD_WAITs.
 const MAX_INFLIGHT_CHUNK_REQUESTS: usize = 8;
 
+/// How many downloaded chunks may wait to be written. Unbounded, a disk slower
+/// than the connection let the workers queue the whole file in memory; at
+/// 512 KB a chunk this holds the queue to a few megabytes and makes them wait.
+const CHUNK_QUEUE: usize = 8;
+
 // the server says exactly how long to back off; longer than this is a failure
 // rather than a stall
 const FLOOD_WAIT_CAP: u32 = 30;
@@ -108,7 +113,7 @@ async fn download_concurrent(
     let mut file = tokio::fs::File::create(path).await?;
     file.set_len(total as u64).await?;
 
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(u64, Vec<u8>)>();
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<(u64, Vec<u8>)>(CHUNK_QUEUE);
     let next_offset = Arc::new(AtomicI64::new(0));
     let file_dc = Arc::new(AtomicI32::new(0));
     let needs_serial = Arc::new(AtomicBool::new(false));
@@ -185,7 +190,7 @@ async fn download_concurrent(
                         anyhow::bail!("Telegram redirected the download to a CDN, which isn't supported");
                     }
                 };
-                if tx.send((offset as u64, file.bytes)).is_err() {
+                if tx.send((offset as u64, file.bytes)).await.is_err() {
                     break;
                 }
             }

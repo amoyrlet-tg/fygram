@@ -89,13 +89,8 @@ pub(crate) async fn telegram_session_state(
 }
 
 #[tauri::command]
-pub(crate) async fn read_image_as_data_url(path: String) -> Result<String, String> {
-    Box::pin(async move {
-        service::read_image_as_data_url(path)
-            .await
-            .map_err(String::from)
-    })
-    .await
+pub(crate) async fn ambient_colour(path: String) -> Result<Option<String>, String> {
+    Box::pin(async move { service::ambient_colour(path).await.map_err(String::from) }).await
 }
 
 #[tauri::command]

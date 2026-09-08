@@ -54,7 +54,6 @@ thiserror = "2"
 
 regex = "1"
 
-base64 = "0.22"
 
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "query"] }
 flate2 = "1"

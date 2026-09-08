@@ -123,7 +123,7 @@ pub fn run() {
             auth_commands::telegram_is_authorized,
             auth_commands::telegram_session_state,
             auth_commands::get_current_user,
-            auth_commands::read_image_as_data_url,
+            auth_commands::ambient_colour,
             auth_commands::logout,
             broadcast_commands::get_broadcast_config,
             broadcast_commands::set_broadcast_config,

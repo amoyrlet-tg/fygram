@@ -177,22 +177,18 @@ pub(crate) async fn session_state(state: State<'_, AppState>) -> Result<SessionS
     })
 }
 
-pub(crate) async fn read_image_as_data_url(path: String) -> Result<String, AppError> {
-    use base64::Engine;
+/// The colour a picture reads as, computed here rather than in the webview.
+///
+/// The renderer only ever wanted three numbers out of the file, so it gets
+/// three numbers: sending the picture itself meant a base64 string and a
+/// decoded bitmap per cover, both of which the webview then held on to.
+pub(crate) async fn ambient_colour(path: String) -> Result<Option<String>, AppError> {
     let bytes = tokio::fs::read(&path).await?;
-    let mime = match std::path::Path::new(&path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(str::to_lowercase)
-        .as_deref()
-    {
-        Some("png") => "image/png",
-        Some("gif") => "image/gif",
-        Some("webp") => "image/webp",
-        _ => "image/jpeg",
-    };
-    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
-    Ok(format!("data:{mime};base64,{encoded}"))
+    Ok(tokio::task::spawn_blocking(move || {
+        crate::features::library::media::covers::ambient_colour_of(&bytes)
+    })
+    .await
+    .unwrap_or(None))
 }
 
 pub(crate) async fn current_user(
