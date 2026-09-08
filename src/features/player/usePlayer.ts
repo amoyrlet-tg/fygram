@@ -10,9 +10,11 @@ import {
   END_EPSILON,
   LAST_TRACK_STORAGE_KEY,
   MIN_PLAY_MS,
+  NEAR_END_S,
   PLAY_RETRY_ATTEMPTS,
   PLAY_RETRY_DELAY_MS,
   POLL_MS,
+  POSITION_SYNC_MS,
   PROFILE_SYNC_MS,
   FADE_BACK_MS,
   FADE_STEP_MS,
@@ -86,6 +88,13 @@ export function usePlayer() {
   const [index, setIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
+  // where playback was the last time we heard it from the backend, and when we
+  // heard it: the ticks in between are read off the clock rather than asked for
+  const positionBaseRef = useRef({ position: 0, at: 0 });
+  const applyPosition = useCallback((seconds: number) => {
+    positionBaseRef.current = { position: seconds, at: Date.now() };
+    setPosition(seconds);
+  }, []);
   const [volume, setVolumeState] = useState(loadSavedVolume);
   const [shuffle, setShuffle] = useState(() => loadSavedSession()?.shuffle ?? false);
   const [repeat, setRepeat] = useState<RepeatMode>(() => loadSavedSession()?.repeat ?? "off");
@@ -207,7 +216,7 @@ export function usePlayer() {
 
       setQueue(tracks);
       setIndex(startIndex);
-      setPosition(startSeconds);
+      applyPosition(startSeconds);
       setIsPlaying(true);
       startedAtRef.current = Date.now();
       progressedRef.current = false;
@@ -270,7 +279,7 @@ export function usePlayer() {
         historyPosRef.current = historyRef.current.length - 1;
       }
     },
-    [playWithRetry, markUnavailable, markAvailable, stopPlayback],
+    [playWithRetry, markUnavailable, markAvailable, stopPlayback, applyPosition],
   );
 
   const playFromHistory = useCallback(
@@ -367,9 +376,30 @@ export function usePlayer() {
 
   useEffect(() => {
     if (!isPlaying || !current) return;
+
+    // the clock was left behind while paused, so start from what is on screen
+    positionBaseRef.current = { position: stateRef.current.position, at: Date.now() };
+    let cancelled = false;
+    let askedAt = 0;
+
     const id = window.setInterval(async () => {
+      const base = positionBaseRef.current;
+      const elapsed = base.position + (Date.now() - base.at) / 1000;
+      if (elapsed > END_EPSILON) progressedRef.current = true;
+
+      // a track of unknown length is always treated as nearly over: only the
+      // backend can say it drained, and it must not be missed
+      const duration = current.duration_sec;
+      const nearEnd = duration === null || duration - elapsed <= NEAR_END_S;
+      if (Date.now() - askedAt < (nearEnd ? POLL_MS : POSITION_SYNC_MS)) {
+        setPosition(elapsed);
+        return;
+      }
+
+      askedAt = Date.now();
       const { position: pos, finished } = await playerApi.getPlaybackPosition();
-      setPosition(pos);
+      if (cancelled) return;
+      applyPosition(pos);
       if (pos > END_EPSILON) progressedRef.current = true;
 
       if (Date.now() - startedAtRef.current < MIN_PLAY_MS) return;
@@ -379,8 +409,11 @@ export function usePlayer() {
         advance(1);
       }
     }, POLL_MS);
-    return () => window.clearInterval(id);
-  }, [isPlaying, current, advance]);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [isPlaying, current, advance, applyPosition]);
 
   useEffect(() => {
     const trackId = current && isPlaying ? current.id : null;
@@ -463,31 +496,34 @@ export function usePlayer() {
     return () => window.removeEventListener("beforeunload", saveSession);
   }, [saveSession]);
 
-  const restoreSession = useCallback((library: Track[]) => {
-    const saved = loadSavedSession();
-    if (!saved || library.length === 0) return;
+  const restoreSession = useCallback(
+    (library: Track[]) => {
+      const saved = loadSavedSession();
+      if (!saved || library.length === 0) return;
 
-    const byId = new Map(library.map((t) => [t.id, t]));
-    const tracks: Track[] = [];
-    let restoredIndex = -1;
-    saved.queue.forEach((id, i) => {
-      const track = byId.get(id);
-      if (!track) return;
-      if (i === saved.index) restoredIndex = tracks.length;
-      tracks.push(track);
-    });
-    if (tracks.length === 0) return;
+      const byId = new Map(library.map((t) => [t.id, t]));
+      const tracks: Track[] = [];
+      let restoredIndex = -1;
+      saved.queue.forEach((id, i) => {
+        const track = byId.get(id);
+        if (!track) return;
+        if (i === saved.index) restoredIndex = tracks.length;
+        tracks.push(track);
+      });
+      if (tracks.length === 0) return;
 
-    const droppedCurrent = restoredIndex === -1;
-    if (droppedCurrent) restoredIndex = 0;
+      const droppedCurrent = restoredIndex === -1;
+      if (droppedCurrent) restoredIndex = 0;
 
-    setQueue(tracks);
-    setIndex(restoredIndex);
-    setPosition(droppedCurrent ? 0 : saved.position);
-    setIsPlaying(false);
-    historyRef.current = [tracks[restoredIndex]];
-    historyPosRef.current = 0;
-  }, []);
+      setQueue(tracks);
+      setIndex(restoredIndex);
+      applyPosition(droppedCurrent ? 0 : saved.position);
+      setIsPlaying(false);
+      historyRef.current = [tracks[restoredIndex]];
+      historyPosRef.current = 0;
+    },
+    [applyPosition],
+  );
 
   const play = useCallback(
     (tracks: Track[], startIndex: number) => {
@@ -544,14 +580,14 @@ export function usePlayer() {
   const previous = useCallback(() => {
     if (position > 3) {
       playerApi.seekPlayback(0);
-      setPosition(0);
+      applyPosition(0);
       beatRef.current(0);
       return;
     }
     failStreakRef.current = 0;
     setPlaybackError(null);
     advance(-1);
-  }, [advance, position]);
+  }, [advance, position, applyPosition]);
 
   // The card Android draws in the notification shade. Its buttons arrive here
   // rather than in Rust because the queue lives here - see src/android.rs.
@@ -566,11 +602,14 @@ export function usePlayer() {
     };
   }, [togglePlay, next, previous]);
 
-  const seek = useCallback((seconds: number) => {
-    playerApi.seekPlayback(seconds);
-    setPosition(seconds);
-    beatRef.current(seconds);
-  }, []);
+  const seek = useCallback(
+    (seconds: number) => {
+      playerApi.seekPlayback(seconds);
+      applyPosition(seconds);
+      beatRef.current(seconds);
+    },
+    [applyPosition],
+  );
 
   const setVolume = useCallback((v: number) => {
     setVolumeState(v);
