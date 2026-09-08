@@ -16,6 +16,7 @@ import {
   POLL_MS,
   POSITION_SYNC_MS,
   PROFILE_SYNC_MS,
+  PROGRESS_THROTTLE_MS,
   FADE_BACK_MS,
   FADE_STEP_MS,
   QUIET_GAIN,
@@ -356,6 +357,10 @@ export function usePlayer() {
     [startAt, playFromHistory, stopPlayback],
   );
 
+  // the backend reports every 120ms, and each report re-rendered the whole
+  // library below us; the bar does not need more than a few frames a second
+  const fetchProgressAtRef = useRef(0);
+
   useEffect(() => {
     const unlisten = listen<{ track_id: string; downloaded: number; total: number }>(
       "track-fetch-progress",
@@ -363,9 +368,13 @@ export function usePlayer() {
         if (!current || event.payload.track_id !== current.id) return;
         const { track_id, downloaded, total } = event.payload;
         if (total > 0 && downloaded >= total) {
+          fetchProgressAtRef.current = 0;
           setFetchProgress(null);
           return;
         }
+        const now = Date.now();
+        if (now - fetchProgressAtRef.current < PROGRESS_THROTTLE_MS) return;
+        fetchProgressAtRef.current = now;
         setFetchProgress({ trackId: track_id, downloaded, total });
       },
     );

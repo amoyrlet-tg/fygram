@@ -22,6 +22,9 @@ import { channelsApi } from "./api";
 
 const SYNC_ERROR_LINGER_MS = 15_000;
 const SYNC_SILENCE_TIMEOUT_MS = 90_000;
+/** Progress arrives every 120ms per track, four tracks at a time; the counter
+ * does not need redrawing the library that often. */
+const PROGRESS_THROTTLE_MS = 250;
 
 export function useChannelSync(opts: {
   channels: Channel[];
@@ -91,9 +94,17 @@ export function useChannelSync(opts: {
     };
   }, [flushSyncTracks]);
 
+  const downloadProgressAtRef = useRef(0);
+
   useEffect(() => {
     const unlisten = listen<DownloadProgress>("download-progress", (event) => {
       const { channel_id, done } = event.payload;
+      // one event per finished track, and four download at once: without this
+      // the whole library re-renders dozens of times a second while a channel
+      // downloads. The finish always lands, so the count never sticks.
+      const now = Date.now();
+      if (!done && now - downloadProgressAtRef.current < PROGRESS_THROTTLE_MS) return;
+      downloadProgressAtRef.current = now;
       setDownloadProgress((prev) => ({ ...prev, [channel_id]: event.payload }));
       if (done) {
         window.setTimeout(() => {

@@ -29,6 +29,9 @@ export const POSITION_SYNC_MS = 5_000;
 /** Inside this much of the end, go back to asking every tick: the handover to
  * the next track has to happen on time, and only the backend knows it drained. */
 export const NEAR_END_S = 10;
+/** Download progress arrives every 120ms per track. Redrawing the library that
+ * often is what made downloading cost more memory than playing. */
+export const PROGRESS_THROTTLE_MS = 250;
 export const PROFILE_SYNC_MS = 15_000;
 export const BROADCAST_MS = 3_000;
 export const END_EPSILON = 0.75;
