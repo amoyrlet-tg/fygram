@@ -1,6 +1,3 @@
-//! Where every file the library owns lives on disk. One place decides the whole
-//! layout, so a path is never built by hand anywhere else.
-
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -41,7 +38,6 @@ pub(crate) fn track_path(root: &Path, channel_id: &str, hash: &str, ext: &str) -
         .join(format!("{hash}.{ext}"))
 }
 
-/// Named after the same hash as the audio, so a move carries both.
 pub(crate) fn cover_path(root: &Path, channel_id: &str, hash: &str) -> PathBuf {
     channel_dir(root, channel_id)
         .join(COVERS_DIR)
@@ -49,19 +45,18 @@ pub(crate) fn cover_path(root: &Path, channel_id: &str, hash: &str) -> PathBuf {
         .join(format!("{hash}.img"))
 }
 
-/// Left beside a track with no picture, so its tags are not re-read on every
-/// scroll.
 pub(crate) fn no_cover_path(root: &Path, channel_id: &str, hash: &str) -> PathBuf {
     cover_path(root, channel_id, hash).with_extension("none")
 }
 
-/// Away from the channel shards: these belong to no channel.
+pub(crate) fn cover_preview_path(root: &Path, channel_id: &str, hash: &str) -> PathBuf {
+    cover_path(root, channel_id, hash).with_extension("prev.jpg")
+}
+
 pub(crate) fn playlist_covers_dir(root: &Path) -> PathBuf {
     root.join(PLAYLISTS_DIR)
 }
 
-/// The stamp is in the name on purpose: a stable path keeps its URL, and the
-/// webview would go on showing the copy it had cached.
 pub(crate) fn playlist_cover_path(root: &Path, playlist_id: &str, stamp: i64) -> PathBuf {
     playlist_covers_dir(root).join(format!("{playlist_id}-{stamp}.jpg"))
 }

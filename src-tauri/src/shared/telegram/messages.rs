@@ -1,5 +1,3 @@
-//! Reading and rewriting a single message - which, for a track, is how an edit reaches the channel.
-
 use std::path::Path;
 use std::time::Duration;
 
@@ -11,22 +9,17 @@ use grammers_session::types::PeerRef;
 
 use super::TelegramState;
 
-/// One track as Telegram should hold it.
 pub(crate) struct TrackUpload<'a> {
     pub(crate) file_path: &'a Path,
     pub(crate) title: &'a str,
     pub(crate) performer: &'a str,
     pub(crate) duration: Duration,
 
-    /// None only when the file carries no usable picture.
     pub(crate) thumbnail: Option<Vec<u8>>,
 }
 
 pub(crate) struct MessageMeta {
-    /// The caption already on the message; an edit keeps it.
     pub(crate) text: String,
-    /// Set only for a forward, which cannot be edited at all - so this doubles
-    /// as the flag.
     pub(crate) forwarded_at: Option<chrono::DateTime<chrono::Utc>>,
     pub(crate) forwarded_from: Option<String>,
 }
@@ -38,8 +31,6 @@ impl MessageMeta {
 }
 
 impl TelegramState {
-    /// The caption is needed for the edit anyway, so the forward header comes
-    /// free - and finding out later would mean finding out after the upload.
     pub(crate) async fn message_meta(&self, peer: PeerRef, message_id: i32) -> Result<MessageMeta> {
         let client = self.client().await?;
         let message = client
@@ -68,9 +59,6 @@ impl TelegramState {
         })
     }
 
-    /// The only way to fix a forwarded track: Telegram refuses to edit one.
-    /// The new message goes up first, so a failure halfway leaves the channel
-    /// with the track it already had.
     pub(crate) async fn repost_track(
         &self,
         peer: PeerRef,
@@ -84,7 +72,6 @@ impl TelegramState {
 
         if delete_original {
             if let Err(err) = client.delete_messages(peer, &[old_message_id]).await {
-                // untidy but recoverable; losing the new one would not be
                 crate::log!(
                     "repost_track: posted {posted} but could not delete {old_message_id}: {err}"
                 );
@@ -127,7 +114,6 @@ impl TelegramState {
     }
 }
 
-/// Labelling an m4a as mp3 makes clients guess, so the upload says what it is.
 fn mime_for(path: &Path) -> &'static str {
     match path
         .extension()
@@ -144,7 +130,6 @@ fn mime_for(path: &Path) -> &'static str {
     }
 }
 
-/// The message a track travels in.
 async fn track_message(
     client: &Client,
     track: TrackUpload<'_>,
@@ -161,8 +146,6 @@ async fn track_message(
             performer: Some(track.performer.to_string()),
         });
 
-    // a music message shows this file, not anything inside the audio, so an
-    // edit without one leaves it bare. must follow `document`.
     if let Some(bytes) = track.thumbnail {
         let size = bytes.len();
         let thumb = client

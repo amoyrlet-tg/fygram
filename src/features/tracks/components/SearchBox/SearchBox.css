@@ -12,9 +12,6 @@
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   color: var(--text-faint);
-  transition:
-    background var(--duration-short) var(--ease-productive),
-    border-color var(--duration-short) var(--ease-productive);
 }
 .searchbar:hover {
   background: var(--bg-hover);
@@ -54,46 +51,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition:
-    background var(--duration-shortest) ease,
-    color var(--duration-shortest) ease;
 }
 .searchbar-clear:hover {
   background: var(--accent-soft);
-  color: var(--text);
-}
-
-.searchbar-mobile {
-  flex: 0 0 auto;
-  min-width: 0;
-  width: auto;
-  height: 42px;
-  border-radius: var(--radius-sm);
-  padding: 0 var(--spacing-tighter-3) 0 var(--spacing-tighter);
-}
-.searchbar-mobile,
-.searchbar-mobile:hover {
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--border-strong);
-  color: var(--text-dim);
-}
-.searchbar-mobile.is-focused {
-  background: var(--bg-hover);
-  border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
-  color: var(--text-dim);
-}
-.searchbar-mobile input {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--text);
-}
-.searchbar-mobile input::placeholder {
-  color: var(--text-faint);
-}
-.searchbar-mobile .searchbar-clear {
-  color: var(--text-dim);
-}
-.searchbar-mobile .searchbar-clear:hover {
-  background: color-mix(in srgb, var(--text) 10%, transparent);
   color: var(--text);
 }

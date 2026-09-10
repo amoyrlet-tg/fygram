@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import type { Playlist, Track } from "@/shared/api/types";
-import { formatRuntime, totalDurationSeconds } from "@/shared/lib/format";
 import { fuzzyTextMatches } from "@/shared/lib/fuzzy";
-import { trackGroupKey } from "@/shared/lib/trackKey";
+import { trackIdentity } from "@/shared/lib/trackKey";
 import { VARIOUS_ARTISTS_KEY } from "@/shared/lib/artists";
 import { useT } from "@/shared/i18n";
 import { channelsApi } from "@/features/channels/api";
@@ -12,18 +11,20 @@ import { tracksApi } from "@/features/tracks/api";
 import { useArtists } from "@/features/artists/useArtists";
 import { useChannelSync } from "@/features/channels/useChannelSync";
 import { useDeleteChannel } from "@/features/channels/useDeleteChannel";
+import { useEditChannel } from "@/features/channels/useEditChannel";
 import { SyncDialog } from "@/features/channels/components/SyncDialog";
 import { usePlaylistActions } from "@/features/playlists/usePlaylistActions";
 import { useSyncStatus } from "@/features/sync/useSyncStatus";
 import { useTrackActions } from "@/features/tracks/useTrackActions";
 import { PlayerProvider, usePlayerApi } from "./providers/PlayerProvider";
-import { useIsNarrow, useCompactColumns } from "@/shared/hooks/useNarrowLayout";
+import { useCompactColumns } from "@/shared/hooks/useMediaQuery";
+import { useKeyboardControls } from "@/features/player/useKeyboardControls";
 import type { View } from "@/app/view";
 import { SettingsProvider } from "./providers/SettingsProvider";
 import { WideLayout } from "@/layouts/wide/WideLayout";
-import { NarrowLayout, type NarrowTab } from "@/layouts/narrow/NarrowLayout";
 import { TrackTable } from "@/features/tracks/components/TrackTable";
 import { ChannelPicker } from "@/features/channels/components/ChannelPicker";
+import { NewPlaylistDialog } from "@/features/playlists/components/NewPlaylistDialog";
 import { useChannelRightsNotice } from "@/features/channels/useEditRights";
 import { useMemoryLog } from "@/features/diagnostics/useMemoryLog";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
@@ -50,6 +51,7 @@ function LibraryContent() {
   const [view, setView] = useState<View>({ kind: "library" });
   const [searchQuery, setSearchQuery] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [newPlaylistOpen, setNewPlaylistOpen] = useState(false);
 
   const player = usePlayerApi();
 
@@ -83,6 +85,13 @@ function LibraryContent() {
   useChannelRightsNotice();
   useMemoryLog(allTracks.length);
 
+  useKeyboardControls({
+    next: player.next,
+    previous: player.previous,
+    togglePlay: player.togglePlay,
+    enabled: allTracks.length > 0,
+  });
+
   useEffect(() => {
     const unlisten = listen("library-changed", () => {
       refreshChannels();
@@ -114,7 +123,15 @@ function LibraryContent() {
     finalizeDeleteChannel,
   } = useDeleteChannel({ channels, view, setView, refreshChannels, refreshTracks });
 
-  const { status: syncStatus, syncNow } = useSyncStatus();
+  const patchChannel = useCallback((channelId: string, patch: Partial<Channel>) => {
+    setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, ...patch } : c)));
+  }, []);
+  const { renameChannel, changeChannelPhoto } = useEditChannel({
+    refreshChannels,
+    patchChannel,
+  });
+
+  useSyncStatus();
 
   const {
     handleCreatePlaylist,
@@ -143,7 +160,7 @@ function LibraryContent() {
     markDownloadStarted,
   });
 
-  const { handleUpdateTrack, mergingArtists, handleMergeArtists } = useTrackActions({
+  const { handleUpdateTrack } = useTrackActions({
     setAllTracks,
     setPlaylistTracks,
     refreshTracks,
@@ -188,32 +205,31 @@ function LibraryContent() {
     if (!collapseDuplicates) {
       return { rows: displayedTracks, sources: {} as Record<string, string[]> };
     }
-    const first = new Map<string, Track>();
-    const channelsOf = new Map<string, string[]>();
+    const groups = new Map<string, Track[]>();
+    const order: string[] = [];
     for (const tr of displayedTracks) {
-      const k = trackGroupKey(tr.artist, tr.title);
-      const head = first.get(k);
-      if (head) {
-        const list = channelsOf.get(head.id) ?? [];
-        if (!list.includes(tr.channel_id)) list.push(tr.channel_id);
-        channelsOf.set(head.id, list);
-      } else {
-        first.set(k, tr);
-        channelsOf.set(tr.id, [tr.channel_id]);
+      const key = trackIdentity(tr);
+      const group = groups.get(key);
+      if (group) group.push(tr);
+      else {
+        groups.set(key, [tr]);
+        order.push(key);
       }
     }
-    return { rows: Array.from(first.values()), sources: Object.fromEntries(channelsOf) };
-  }, [collapseDuplicates, displayedTracks]);
 
-  const viewMeta = useMemo(() => {
-    if (displayedTracks.length === 0) return "";
-    const runtime = formatRuntime(totalDurationSeconds(displayedTracks), {
-      hr: t("hr"),
-      min: t("min"),
-    });
-    const count = `${displayedTracks.length} ${t("songs")}`;
-    return runtime ? `${count} · ${runtime}` : count;
-  }, [displayedTracks, t]);
+    const writable = new Set(channels.filter((c) => c.can_edit === true).map((c) => c.id));
+    const rows: Track[] = [];
+    const channelsOf: Record<string, string[]> = {};
+    for (const key of order) {
+      const group = groups.get(key)!;
+      const head = group.find((tr) => writable.has(tr.channel_id)) ?? group[0];
+      rows.push(head);
+      const seen: string[] = [];
+      for (const tr of group) if (!seen.includes(tr.channel_id)) seen.push(tr.channel_id);
+      channelsOf[head.id] = seen;
+    }
+    return { rows, sources: channelsOf };
+  }, [collapseDuplicates, displayedTracks, channels]);
 
   const baseViewTitle =
     view.kind === "library"
@@ -226,27 +242,21 @@ function LibraryContent() {
             : view.artist
           : (playlists.find((p) => p.id === view.playlistId)?.name ?? t("Playlist"));
   const viewTitle = isSearching ? t("Search results") : baseViewTitle;
+  const viewKindLabel = isSearching
+    ? t("Search")
+    : view.kind === "library"
+      ? t("Library")
+      : view.kind === "channel"
+        ? t("Channel")
+        : view.kind === "artist"
+          ? t("Artist")
+          : t("Playlist");
 
   const handleAddChannel = useCallback(() => setPickerOpen(true), []);
   const handlePickerClose = useCallback(() => setPickerOpen(false), []);
   const handlePickerAdded = useCallback(() => refreshChannels(), [refreshChannels]);
 
-  const isNarrow = useIsNarrow();
   const compactColumns = useCompactColumns();
-  const [narrowTab, setNarrowTab] = useState<NarrowTab>("home");
-
-  const handleNarrowTabChange = useCallback((tab: NarrowTab) => {
-    if (tab !== "search") {
-      setSearchQuery("");
-    }
-    setNarrowTab(tab);
-  }, []);
-
-  const handleNarrowSelectView = useCallback((v: View) => {
-    setView(v);
-    setNarrowTab("home");
-  }, []);
-
   const handlePlay = useCallback(
     (tracks: Track[], startIndex: number) => {
       const clicked = tracks[startIndex];
@@ -295,6 +305,8 @@ function LibraryContent() {
       onDownloadPlaylist={handleDownloadPlaylist}
       onSyncChannel={requestSyncChannel}
       onDownloadChannel={handleDownloadChannel}
+      onRenameChannel={renameChannel}
+      onChangeChannelPhoto={changeChannelPhoto}
       onDeleteChannel={handleDeleteChannel}
       onCancelSync={handleCancelSync}
       channelBusy={
@@ -309,12 +321,11 @@ function LibraryContent() {
       onAddToPlaylist={handleAddToPlaylist}
       onRemoveFromPlaylist={view.kind === "playlist" ? handleRemoveFromPlaylist : undefined}
       onUpdateTrack={handleUpdateTrack}
-      searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
       reorderable={view.kind === "playlist" && !isSearching}
       onReorder={view.kind === "playlist" ? handleReorderPlaylistTrack : undefined}
       compact={compactColumns}
       unavailableIds={player.unavailableIds}
+      kindLabel={viewKindLabel}
     />
   );
 
@@ -329,6 +340,16 @@ function LibraryContent() {
   const modals = (
     <>
       {pickerOpen && <ChannelPicker onClose={handlePickerClose} onAdded={handlePickerAdded} />}
+
+      {newPlaylistOpen && (
+        <NewPlaylistDialog
+          onCreate={(name, coverPath) => {
+            setNewPlaylistOpen(false);
+            void handleCreatePlaylist(name, coverPath);
+          }}
+          onCancel={() => setNewPlaylistOpen(false)}
+        />
+      )}
 
       {deletePlaylistConfirm?.step === 1 && (
         <ConfirmDialog
@@ -397,38 +418,6 @@ function LibraryContent() {
     </>
   );
 
-  if (isNarrow) {
-    return (
-      <>
-        <NarrowLayout
-          tab={narrowTab}
-          onTabChange={handleNarrowTabChange}
-          viewTitle={viewTitle}
-          searchScopeTitle={view.kind === "library" ? null : baseViewTitle}
-          viewMeta={viewMeta}
-          view={view}
-          onSelectView={handleNarrowSelectView}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          trackContent={trackTable}
-          channels={channels}
-          playlists={playlists}
-          artists={artists}
-          onAddChannel={handleAddChannel}
-          onCreatePlaylist={handleCreatePlaylist}
-          onSyncNow={syncNow}
-          syncStatus={syncStatus}
-          syncProgress={syncProgress}
-          downloadProgress={downloadProgress}
-          onMergeArtists={handleMergeArtists}
-          mergingArtists={mergingArtists}
-        />
-        {modals}
-        {loadingGate}
-      </>
-    );
-  }
-
   return (
     <WideLayout
       channels={channels}
@@ -437,14 +426,14 @@ function LibraryContent() {
       view={view}
       onSelectView={setView}
       onAddChannel={handleAddChannel}
-      onCreatePlaylist={handleCreatePlaylist}
+      onNewPlaylist={() => setNewPlaylistOpen(true)}
       syncProgress={syncProgress}
       downloadProgress={downloadProgress}
-      onMergeArtists={handleMergeArtists}
-      mergingArtists={mergingArtists}
       artistScopeTitle={artistScopeChannel?.title ?? null}
       onClearArtistScope={clearArtistScope}
       trackTable={trackTable}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
       modals={
         <>
           {modals}

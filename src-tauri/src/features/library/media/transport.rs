@@ -1,6 +1,3 @@
-//! The wire under a download: Telegram's chunked `upload.getFile`. The server
-//! decides how fast this goes, not us.
-
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, Ordering};
 use std::sync::Arc;
@@ -20,17 +17,10 @@ const FILE_MIGRATE_ERROR: i32 = 303;
 const FLOOD_WAIT_ERROR: i32 = 420;
 const DOWNLOAD_WORKERS: i64 = 8;
 
-// Telegram counts requests in flight per account, not per file, so every
-// download shares one budget. Going wider than this only earned FLOOD_WAITs.
 const MAX_INFLIGHT_CHUNK_REQUESTS: usize = 8;
 
-/// How many downloaded chunks may wait to be written. Unbounded, a disk slower
-/// than the connection let the workers queue the whole file in memory; at
-/// 512 KB a chunk this holds the queue to a few megabytes and makes them wait.
 const CHUNK_QUEUE: usize = 8;
 
-// the server says exactly how long to back off; longer than this is a failure
-// rather than a stall
 const FLOOD_WAIT_CAP: u32 = 30;
 const FLOOD_WAIT_RETRIES: u32 = 5;
 
@@ -39,7 +29,6 @@ fn chunk_slots() -> &'static tokio::sync::Semaphore {
     SLOTS.get_or_init(|| tokio::sync::Semaphore::new(MAX_INFLIGHT_CHUNK_REQUESTS))
 }
 
-/// The seconds Telegram asked us to wait, if this error is a flood wait.
 fn flood_wait_secs(err: &anyhow::Error) -> Option<u32> {
     err.chain()
         .find_map(|cause| match cause.downcast_ref::<InvocationError>() {

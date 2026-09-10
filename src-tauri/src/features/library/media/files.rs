@@ -1,5 +1,3 @@
-//! Removing audio the library no longer points at.
-
 use std::path::Path;
 
 use sqlx::SqlitePool;

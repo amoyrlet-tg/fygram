@@ -1,5 +1,3 @@
-//! The queue of things changed locally that Telegram has not been told about yet.
-
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 

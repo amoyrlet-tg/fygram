@@ -12,25 +12,15 @@ interface HeapInfo {
   jsHeapSizeLimit?: number;
 }
 
-/** Chromium exposes this and the types do not; it is the only way to see the
- *  JS heap from inside the page. */
 function heap(): HeapInfo {
   const measured = (performance as Performance & { memory?: HeapInfo }).memory;
   return measured ?? {};
 }
 
-/**
- * How many listeners are registered per event name.
- *
- * Tauri keeps them in an array per event, and a leak here is invisible
- * everywhere else: the arrays live outside our code, outside the DOM, and V8
- * never shrinks their backing store. This is what turned out to be growing.
- */
 function listeners(): [string, number][] {
   try {
     const global = window as unknown as Record<string, unknown>;
     let registry = global["__internal_unstable_listeners_object_id__"];
-    // the name says "id", so follow it through the global if that is what it is
     if (typeof registry === "string" || typeof registry === "number") {
       registry = global[String(registry)];
     }
@@ -47,11 +37,6 @@ function listeners(): [string, number][] {
   }
 }
 
-/**
- * Reports what only the webview can see into the backend's memory log: the
- * OS can weigh the process, but not tell us whether the weight is the JS
- * heap, the document, our own caches, or listeners nobody unregistered.
- */
 export function useMemoryLog(tracksInState: number) {
   useEffect(() => {
     const send = () => {
@@ -73,9 +58,7 @@ export function useMemoryLog(tracksInState: number) {
           ],
           listeners: listeners(),
         },
-      }).catch(() => {
-        // the log is a convenience; never let it break the app
-      });
+      }).catch(() => {});
     };
 
     send();

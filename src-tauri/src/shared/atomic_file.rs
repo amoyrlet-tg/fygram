@@ -1,8 +1,3 @@
-//! Writing a file so a power cut cannot leave half of one behind.
-//!
-//! Temp file, fsync, rename, then fsync the directory: a rename is only atomic
-//! once its directory entry has reached the disk.
-
 use std::path::{Path, PathBuf};
 
 fn tmp_sibling(path: &Path) -> PathBuf {

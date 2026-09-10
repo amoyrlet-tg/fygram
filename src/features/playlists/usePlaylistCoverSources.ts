@@ -2,10 +2,6 @@ import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { playlistsApi } from "./api";
 
-/**
- * The tracks each playlist can draw a picture from. One request for all of them,
- * shared module-level so the sidebar and the narrow browser do not both ask.
- */
 let cache: Record<string, string[]> = {};
 const watchers = new Set<() => void>();
 let started = false;

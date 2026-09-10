@@ -22,18 +22,25 @@ function fuzzyMaxDistance(len: number): number {
   return 2;
 }
 
+const SEPARATORS = /[^a-z0-9]+/g;
+
 export function fuzzyTextMatches(haystackLower: string, queryLower: string): boolean {
   const words = queryLower.split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
 
   const haystackT = transliterate(haystackLower);
   let haystackWords: string[] | null = null;
+  let haystackGlued: string | null = null;
 
   return words.every((word) => {
     if (haystackLower.includes(word)) return true;
 
     const wordT = transliterate(word);
     if (haystackT.includes(wordT)) return true;
+
+    const wordGlued = wordT.replace(SEPARATORS, "");
+    haystackGlued ??= haystackT.replace(SEPARATORS, "");
+    if (wordGlued && haystackGlued.includes(wordGlued)) return true;
 
     const maxDist = fuzzyMaxDistance(wordT.length);
     if (maxDist === 0) return false;

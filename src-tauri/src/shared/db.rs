@@ -1,5 +1,3 @@
-//! Opening the database, and keeping the api credentials somewhere a reinstall cannot lose them.
-
 use std::path::Path;
 use std::time::Duration;
 
@@ -7,6 +5,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
+
+use super::schema;
 
 pub(crate) async fn connect(path: &Path) -> Result<SqlitePool> {
     if let Some(parent) = path.parent() {
@@ -27,10 +27,9 @@ pub(crate) async fn connect(path: &Path) -> Result<SqlitePool> {
         .await
         .context("connecting to library database")?;
 
-    sqlx::migrate!("./migrations")
-        .run(&pool)
+    schema::ensure(&pool)
         .await
-        .context("running database migrations")?;
+        .context("applying the database schema")?;
 
     Ok(pool)
 }

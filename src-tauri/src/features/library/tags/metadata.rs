@@ -1,5 +1,3 @@
-//! Cleaning up one tag at a time: the separators, the boilerplate, and the collaborators hiding in a title.
-
 use std::sync::LazyLock;
 
 use regex::Regex;

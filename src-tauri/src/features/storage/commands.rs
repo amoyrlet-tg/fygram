@@ -1,5 +1,3 @@
-//! The IPC surface of the media root: reading it and moving it.
-
 use tauri::{AppHandle, State};
 
 use crate::AppState;

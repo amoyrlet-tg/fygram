@@ -1,7 +1,3 @@
-/**
- * A Map that evicts its oldest entry once it grows past `maxSize`.
- * Reading a key refreshes its position, so hot entries survive longest.
- */
 export class LruMap<K, V> {
   private map = new Map<K, V>();
   constructor(private readonly maxSize: number) {}

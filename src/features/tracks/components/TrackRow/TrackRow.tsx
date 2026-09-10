@@ -3,14 +3,17 @@ import { createPortal } from "react-dom";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Playlist, Track } from "@/shared/api/types";
-import { formatDuration, trackLabel } from "@/shared/lib/format";
+import { formatDateShort, formatDuration, trackLabel } from "@/shared/lib/format";
 import { avatarGradientCss } from "@/shared/lib/avatarColor";
 import { forgetCover, useTrackCover } from "../../useTrackCover";
-import { useT } from "@/shared/i18n";
+import { useLangStore, useT } from "@/shared/i18n";
+import { profileApi } from "@/features/profile/api";
+import { showToast } from "@/shared/ui/Toast";
 import "./TrackRow.css";
 import {
   EditIcon,
   GripIcon,
+  MusicNoteIcon,
   PauseIcon,
   ForwardIcon,
   LockIcon,
@@ -96,6 +99,33 @@ function AddToPlaylistButton({
               className="row-menu"
               style={{ left: pos.left, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
             >
+              <button
+                className="row-menu-item row-menu-profile"
+                onClick={() => {
+                  closeMenu();
+                  void profileApi
+                    .toggleProfileMusic(trackId)
+                    .then((inProfile) =>
+                      showToast({
+                        key: "profile-music",
+                        kind: "ok",
+                        message: inProfile
+                          ? t("Added to the profile.")
+                          : t("Taken out of the profile."),
+                      }),
+                    )
+                    .catch((err) =>
+                      showToast({
+                        key: "profile-music",
+                        kind: "warn",
+                        message: `${t("Couldn't add to the profile:")} ${err}`,
+                      }),
+                    );
+                }}
+              >
+                <MusicNoteIcon size={14} />
+                <span className="truncate">{t("Add to the profile")}</span>
+              </button>
               <div className="row-menu-title">{t("Add to playlist")}</div>
               <div className="row-menu-list">
                 {playlists.length === 0 ? (
@@ -136,7 +166,6 @@ export interface RowProps {
   onPlay: () => void;
   onTogglePlay: () => void;
   startEdit: () => void;
-  /** False turns the pencil into a lock; null means nobody has asked yet. */
   canEdit: boolean | null;
   onAddToPlaylist: (playlistId: string, trackId: string) => void;
   onRemoveFromPlaylist?: (trackId: string) => void;
@@ -169,6 +198,7 @@ function TrackRowCells({
   closeMenu,
 }: RowProps) {
   const t = useT();
+  const { lang } = useLangStore();
   const { title: trackTitle, artist } = trackLabel(track);
   const sourceLabel = (() => {
     const ids = sourceChannels?.length ? sourceChannels : [track.channel_id];
@@ -221,6 +251,11 @@ function TrackRowCells({
           </div>
         </div>
       </td>
+      {!compact && (
+        <td className="col-added dim">
+          {formatDateShort(track.published_at ?? track.added_at, lang)}
+        </td>
+      )}
       <td className="col-duration dim">{formatDuration(track.duration_sec)}</td>
       <td className="col-actions">
         <button
@@ -315,10 +350,9 @@ function TrackThumbnail({ track }: { track: Track }) {
 
   if (cover && !broken) {
     return (
-      // the accent wash shows through wherever a non-square cover leaves a gap
       <div className="track-thumbnail" style={{ background: avatarGradientCss(track.id) }}>
         <img
-          src={cover.src}
+          src={cover.preview}
           alt=""
           loading="lazy"
           decoding="async"

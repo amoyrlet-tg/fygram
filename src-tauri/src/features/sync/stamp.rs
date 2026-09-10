@@ -1,5 +1,3 @@
-//! Who changed something and when, so two machines editing the same row can be ordered.
-
 use std::cmp::Ordering;
 
 use chrono::{DateTime, TimeZone, Utc};

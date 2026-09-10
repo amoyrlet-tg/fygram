@@ -1,5 +1,3 @@
-//! Every SQL statement the media subsystem runs.
-
 use sqlx::SqlitePool;
 
 use crate::shared::models::{Channel, Track};

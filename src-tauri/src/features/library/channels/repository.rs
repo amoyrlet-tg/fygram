@@ -1,5 +1,3 @@
-//! Every SQL statement the channels feature runs.
-
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
@@ -24,8 +22,6 @@ pub(crate) async fn get(db: &SqlitePool, channel_id: &str) -> Result<Channel, Ap
     )
 }
 
-/// What we already know about a channel, without asking Telegram. `can_edit`
-/// stays whatever was last learned, so None for a row nobody has asked about.
 pub(crate) async fn existing_channel_by_id(
     db: &SqlitePool,
     id: i64,
@@ -44,6 +40,7 @@ pub(crate) async fn existing_channel_by_id(
         access_hash: row.access_hash,
         can_edit: row.can_edit,
         can_repost: row.can_repost,
+        broadcast: None,
     }))
 }
 
@@ -84,7 +81,6 @@ pub(crate) async fn upsert_manual(
     .bind(device)
     .bind(info.can_edit)
     .bind(info.can_repost)
-    // stamped only when Telegram actually answered
     .bind(info.can_edit.map(|_| Utc::now()))
     .execute(db)
     .await?;
@@ -97,8 +93,6 @@ pub(crate) async fn upsert_manual(
     )
 }
 
-/// Records what Telegram last said about editing here. No `rev` bump: a right
-/// belongs to this account on this device, and never travels.
 pub(crate) async fn set_edit_right(
     db: &SqlitePool,
     channel_id: &str,
@@ -119,7 +113,56 @@ pub(crate) async fn set_edit_right(
     Ok(())
 }
 
-/// None when the row is gone.
+pub(crate) async fn refresh_identity(
+    db: &SqlitePool,
+    channel_id: &str,
+    title: &str,
+    username: Option<&str>,
+    access_hash: i64,
+) -> Result<bool, AppError> {
+    let changed = sqlx::query(
+        "UPDATE channels \
+            SET title = ?, username = ?, \
+                access_hash = CASE WHEN ? <> 0 THEN ? ELSE access_hash END \
+         WHERE id = ? \
+           AND (title <> ? OR COALESCE(username, '') <> COALESCE(?, '') \
+                OR (? <> 0 AND access_hash <> ?))",
+    )
+    .bind(title)
+    .bind(username)
+    .bind(access_hash)
+    .bind(access_hash)
+    .bind(channel_id)
+    .bind(title)
+    .bind(username)
+    .bind(access_hash)
+    .bind(access_hash)
+    .execute(db)
+    .await?
+    .rows_affected();
+    Ok(changed > 0)
+}
+
+pub(crate) async fn set_title(
+    db: &SqlitePool,
+    channel_id: &str,
+    title: &str,
+    device: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE channels \
+            SET title = ?, rev = rev + 1, updated_at = ?, origin_device = ? \
+         WHERE id = ?",
+    )
+    .bind(title)
+    .bind(Utc::now())
+    .bind(device)
+    .bind(channel_id)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
 pub(crate) async fn edit_right(
     db: &SqlitePool,
     channel_id: &str,

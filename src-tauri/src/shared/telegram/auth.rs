@@ -1,5 +1,3 @@
-//! The sign-in half of the client: the code, the password, and what the server says about either.
-
 use anyhow::{anyhow, Result};
 use grammers_client::SignInError;
 

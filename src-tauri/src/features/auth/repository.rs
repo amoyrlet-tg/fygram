@@ -1,5 +1,3 @@
-//! The api id, api hash and session flags, as they sit in the settings table.
-
 use sqlx::SqlitePool;
 
 use crate::shared::error::AppError;
@@ -38,8 +36,6 @@ pub(crate) async fn save_credentials(
     Ok(())
 }
 
-/// Telegram ties an auth key to the api_id it was minted for, so a session made
-/// under another one is worthless.
 pub(crate) async fn remember_session_api_id(db: &SqlitePool, api_id: i32) {
     let _ = settings::set(db, "session_api_id", &api_id.to_string()).await;
 }

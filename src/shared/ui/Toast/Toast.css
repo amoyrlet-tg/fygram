@@ -1,6 +1,6 @@
 .toast-host {
   position: fixed;
-  top: calc(var(--safe-top) + var(--spacing-base));
+  top: var(--spacing-base);
   left: 0;
   right: 0;
   z-index: 1200;
@@ -31,7 +31,6 @@
   line-height: 1.35;
   text-align: left;
   cursor: pointer;
-  box-shadow: var(--shadow-lg);
   animation: toast-in-top 260ms var(--ease-out);
 }
 
@@ -69,7 +68,7 @@
 
 @media (max-width: 720px) {
   .toast-host {
-    top: calc(var(--safe-top) + var(--spacing-tighter-2));
+    top: var(--spacing-tighter-2);
   }
 
   .toast {

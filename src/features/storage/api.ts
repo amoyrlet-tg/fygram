@@ -5,10 +5,13 @@ import type {
   CacheCleanupResult,
   MediaRootInfo,
   RelocateResult,
+  StorageSlice,
 } from "@/shared/api/types";
 
 export const storageApi = {
   getMediaRoot: () => invoke<MediaRootInfo>("get_media_root"),
+  storageBreakdown: () => invoke<StorageSlice[]>("storage_breakdown"),
+  fileSizes: () => invoke<Record<string, number>>("storage_file_sizes"),
   setMediaRoot: (path: string, moveExisting: boolean) =>
     invoke<RelocateResult>("set_media_root", { path, moveExisting }),
 

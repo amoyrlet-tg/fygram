@@ -1,8 +1,3 @@
-//! The library-wide retag pass.
-//!
-//! No single row can be trusted: tags off Telegram are whatever the uploader
-//! typed, so the library as a whole decides what an artist is called.
-
 use std::collections::HashMap;
 
 use sqlx::SqlitePool;
@@ -12,7 +7,6 @@ use crate::shared::error::AppError;
 
 use super::repository;
 
-/// Returns the ids of the tracks that actually changed.
 pub(super) async fn run(db: &SqlitePool) -> Result<Vec<String>, AppError> {
     let tracks = repository::all(db).await?;
 

@@ -1,24 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
-export function UserAvatar({ path, className }: { path: string; className: string }) {
+export function UserAvatar({
+  path,
+  className,
+  fallback,
+}: {
+  path: string;
+  className: string;
+  fallback?: ReactNode;
+}) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [path]);
-  if (failed) return null;
 
-  const src = convertFileSrc(path);
-  if (path.endsWith(".mp4")) {
-    return (
-      <video
-        className={className}
-        src={src}
-        autoPlay
-        loop
-        muted
-        playsInline
-        onError={() => setFailed(true)}
-      />
-    );
-  }
-  return <img className={className} src={src} alt="" onError={() => setFailed(true)} />;
+  if (failed) return <>{fallback ?? null}</>;
+  return (
+    <img className={className} src={convertFileSrc(path)} alt="" onError={() => setFailed(true)} />
+  );
 }

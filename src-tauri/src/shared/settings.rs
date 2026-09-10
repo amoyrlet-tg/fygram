@@ -1,5 +1,3 @@
-//! The key/value table the app keeps its own preferences in.
-
 use sqlx::SqlitePool;
 
 use super::error::AppError;

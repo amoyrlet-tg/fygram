@@ -4,7 +4,6 @@ import type { Track } from "@/shared/api/types";
 import { trackLabel } from "@/shared/lib/format";
 import { playerApi } from "./api";
 import { profileApi } from "@/features/profile/api";
-import { broadcastApi } from "@/features/broadcast/api";
 
 import {
   END_EPSILON,
@@ -20,7 +19,6 @@ import {
   FADE_BACK_MS,
   FADE_STEP_MS,
   QUIET_GAIN,
-  BROADCAST_MS,
   SESSION_SAVE_MS,
   SESSION_STORAGE_KEY,
   SHUFFLE_NO_REPEAT,
@@ -65,10 +63,7 @@ function loadSavedSession(): StoredSession | null {
     if (legacy) {
       return { queue: [legacy], index: 0, position: 0, shuffle: false, repeat: "off" };
     }
-  } catch {
-    // localStorage is unavailable in a private window; the saved session is a
-    // convenience, not something to fail startup over
-  }
+  } catch {}
   return null;
 }
 
@@ -89,8 +84,6 @@ export function usePlayer() {
   const [index, setIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
-  // where playback was the last time we heard it from the backend, and when we
-  // heard it: the ticks in between are read off the clock rather than asked for
   const positionBaseRef = useRef({ position: 0, at: 0 });
   const applyPosition = useCallback((seconds: number) => {
     positionBaseRef.current = { position: seconds, at: Date.now() };
@@ -150,7 +143,6 @@ export function usePlayer() {
   );
 
   useEffect(() => () => window.clearInterval(fadeTimerRef.current), []);
-  const beatRef = useRef<(at?: number) => void>(() => {});
 
   const stopPlayback = useCallback(() => {
     playSeqRef.current += 1;
@@ -297,13 +289,12 @@ export function usePlayer() {
   );
 
   const advance = useCallback(
-    (direction: 1 | -1) => {
+    (direction: 1 | -1, opts?: { auto?: boolean }) => {
       const { queue: q, index: i, repeat: r, shuffle: shuffleOn } = stateRef.current;
       if (q.length === 0) return;
 
-      if (r === "one" && direction === 1) {
+      if (r === "one" && direction === 1 && opts?.auto) {
         startAt(q, i);
-        beatRef.current(0);
         return;
       }
 
@@ -342,10 +333,11 @@ export function usePlayer() {
         }
       }
 
+      const wraps = r !== "off";
       let next = i + direction;
-      if (next < 0) next = r === "all" ? q.length - 1 : 0;
+      if (next < 0) next = wraps ? q.length - 1 : 0;
       if (next >= q.length) {
-        if (r === "all") next = 0;
+        if (wraps) next = 0;
         else {
           setIsPlaying(false);
           stopPlayback();
@@ -357,8 +349,6 @@ export function usePlayer() {
     [startAt, playFromHistory, stopPlayback],
   );
 
-  // the backend reports every 120ms, and each report re-rendered the whole
-  // library below us; the bar does not need more than a few frames a second
   const fetchProgressAtRef = useRef(0);
 
   useEffect(() => {
@@ -386,7 +376,6 @@ export function usePlayer() {
   useEffect(() => {
     if (!isPlaying || !current) return;
 
-    // the clock was left behind while paused, so start from what is on screen
     positionBaseRef.current = { position: stateRef.current.position, at: Date.now() };
     let cancelled = false;
     let askedAt = 0;
@@ -396,8 +385,6 @@ export function usePlayer() {
       const elapsed = base.position + (Date.now() - base.at) / 1000;
       if (elapsed > END_EPSILON) progressedRef.current = true;
 
-      // a track of unknown length is always treated as nearly over: only the
-      // backend can say it drained, and it must not be missed
       const duration = current.duration_sec;
       const nearEnd = duration === null || duration - elapsed <= NEAR_END_S;
       if (Date.now() - askedAt < (nearEnd ? POLL_MS : POSITION_SYNC_MS)) {
@@ -415,7 +402,7 @@ export function usePlayer() {
 
       const drained = finished && progressedRef.current;
       if (drained) {
-        advance(1);
+        advance(1, { auto: true });
       }
     }, POLL_MS);
     return () => {
@@ -436,37 +423,6 @@ export function usePlayer() {
 
   const positionRef = useRef(0);
   positionRef.current = position;
-  const lastBroadcastRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!current) {
-      beatRef.current = () => {};
-      return;
-    }
-
-    const switched = lastBroadcastRef.current !== current.id;
-    lastBroadcastRef.current = current.id;
-
-    const beat = (at?: number) => {
-      void broadcastApi
-        .nowPlaying(current.id, at ?? positionRef.current, isPlaying)
-        .catch(() => {});
-    };
-
-    beatRef.current = beat;
-    beat(switched ? 0 : undefined);
-    if (!isPlaying) return;
-
-    const id = window.setInterval(() => beat(), BROADCAST_MS);
-    return () => window.clearInterval(id);
-  }, [current, isPlaying]);
-
-  useEffect(() => {
-    if (current) return;
-    void broadcastApi.stop().catch(() => {});
-  }, [current]);
-
-  useEffect(() => () => void broadcastApi.stop().catch(() => {}), []);
 
   const saveSession = useCallback(() => {
     const { queue: q, index: i, position: pos, shuffle: sh, repeat: rep } = stateRef.current;
@@ -480,10 +436,7 @@ export function usePlayer() {
         repeat: rep,
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-    } catch {
-      // localStorage is unavailable in a private window; the saved session is a
-      // convenience, not something to fail startup over
-    }
+    } catch {}
   }, []);
 
   useEffect(() => saveSession(), [saveSession, queue, index, shuffle, repeat]);
@@ -587,12 +540,9 @@ export function usePlayer() {
   }, [advance]);
 
   const previous = useCallback(() => {
-    // read through the ref: depending on `position` rebuilt this callback twice
-    // a second, and the media-transport listener re-subscribed with it
     if (stateRef.current.position > 3) {
       playerApi.seekPlayback(0);
       applyPosition(0);
-      beatRef.current(0);
       return;
     }
     failStreakRef.current = 0;
@@ -600,24 +550,10 @@ export function usePlayer() {
     advance(-1);
   }, [advance, applyPosition]);
 
-  // The card Android draws in the notification shade. Its buttons arrive here
-  // rather than in Rust because the queue lives here - see src/android.rs.
-  useEffect(() => {
-    const unlisten = listen<string>("media-transport", (event) => {
-      if (event.payload === "next") next();
-      else if (event.payload === "previous") previous();
-      else togglePlay();
-    });
-    return () => {
-      unlisten.then((f) => f());
-    };
-  }, [togglePlay, next, previous]);
-
   const seek = useCallback(
     (seconds: number) => {
       playerApi.seekPlayback(seconds);
       applyPosition(seconds);
-      beatRef.current(seconds);
     },
     [applyPosition],
   );
@@ -627,10 +563,7 @@ export function usePlayer() {
     playerApi.setVolume(v * gainRef.current);
     try {
       localStorage.setItem(VOLUME_STORAGE_KEY, String(v));
-    } catch {
-      // localStorage is unavailable in a private window; the saved session is a
-      // convenience, not something to fail startup over
-    }
+    } catch {}
   }, []);
 
   const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);

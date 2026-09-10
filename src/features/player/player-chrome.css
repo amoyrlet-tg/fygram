@@ -11,16 +11,12 @@
   font: inherit;
   font-weight: 700;
   font-size: 17px;
-  /* white on the accent wash, like every other placeholder in the app */
+
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
   flex-shrink: 0;
   overflow: hidden;
   cursor: pointer;
-  transition: transform var(--duration-shortest) var(--ease-out);
-}
-.player-art:hover {
-  transform: scale(1.04);
 }
 .player-art img {
   width: 100%;
@@ -47,13 +43,12 @@
   color: var(--accent);
   animation: player-loading-pulse 1.2s ease-in-out infinite;
 }
-
 .player-error,
-.player-bar .player-error,
-.mobile-player-meta p.player-error {
+.player-bar .player-error {
   color: var(--danger);
   opacity: 1;
 }
+
 @keyframes player-loading-pulse {
   0%,
   100% {
@@ -75,9 +70,6 @@
   align-items: center;
   justify-content: center;
   margin: 0 6px;
-  transition:
-    background 0.18s ease,
-    transform 0.12s ease;
 }
 .transport-play-btn {
   background: var(--blue);
@@ -88,10 +80,6 @@
 }
 .transport-play-btn:hover:not(:disabled) {
   background: var(--blue-hover);
-  transform: scale(1.05);
-}
-.transport-play-btn:active:not(:disabled) {
-  transform: scale(0.92);
 }
 .transport-play-btn:disabled {
   opacity: 0.4;

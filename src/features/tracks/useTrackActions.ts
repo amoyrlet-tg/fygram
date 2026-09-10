@@ -20,7 +20,6 @@ export function useTrackActions(opts: {
         artist: string | null;
         album: string | null;
         coverPath: string | null;
-        /** Set when the message is a forward - see TrackEditDialog. */
         repost?: { caption: string; deleteOriginal: boolean };
       },
     ): Promise<boolean> => {
@@ -28,13 +27,11 @@ export function useTrackActions(opts: {
         const updated = fields.repost
           ? await tracksApi.repostTrack(trackId, { ...fields, ...fields.repost })
           : await tracksApi.updateTrack(trackId, fields);
-        // the picture lives inside the file; drop the extracted copy
         if (fields.coverPath) refreshCover(trackId);
         setAllTracks((prev) => prev.map((tr) => (tr.id === trackId ? updated : tr)));
         setPlaylistTracks((prev) => prev.map((tr) => (tr.id === trackId ? updated : tr)));
         return true;
       } catch (err) {
-        // the backend's message already says what to do about it
         showToast({
           key: "track-edit-failed",
           kind: "warn",

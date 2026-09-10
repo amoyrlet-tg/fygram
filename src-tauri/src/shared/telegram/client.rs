@@ -1,5 +1,3 @@
-//! Connecting, and keeping the connection alive.
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -16,7 +14,11 @@ impl TelegramState {
         self.shutdown().await;
 
         let session = Arc::new(FileSession::open(session_path));
-        let SenderPool { runner, handle, .. } = SenderPool::new(Arc::clone(&session), api_id);
+        let SenderPool {
+            runner,
+            handle,
+            updates,
+        } = SenderPool::new(Arc::clone(&session), api_id);
         let client = Client::new(handle);
         let runner_task = tokio::spawn(runner.run());
 
@@ -24,6 +26,7 @@ impl TelegramState {
         inner.client = Some(client);
         inner.runner = Some(runner_task);
         inner.session = Some(session);
+        inner.updates = Some(updates);
         Ok(())
     }
 

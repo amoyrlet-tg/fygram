@@ -1,5 +1,3 @@
-//! Every SQL statement the tracks feature runs.
-
 use sqlx::SqlitePool;
 
 use crate::shared::error::AppError;
@@ -23,8 +21,6 @@ pub(super) async fn get_one(db: &SqlitePool, id: &str) -> Result<Track, AppError
     )
 }
 
-/// Newest first by publication date; the added date stands in for rows that
-/// never carried one.
 pub(super) async fn list_ordered(db: &SqlitePool) -> Result<Vec<Track>, AppError> {
     Ok(sqlx::query_as::<_, Track>(
         "SELECT * FROM tracks ORDER BY COALESCE(published_at, added_at) DESC",
@@ -39,7 +35,6 @@ pub(super) async fn all(db: &SqlitePool) -> Result<Vec<Track>, AppError> {
         .await?)
 }
 
-/// The date is the one thing a replacement cannot recover on its own.
 pub(super) async fn mark_forwarded(
     db: &SqlitePool,
     track_id: &str,
@@ -96,8 +91,6 @@ pub(super) async fn update_tags(
     Ok(())
 }
 
-/// One transaction: a half-applied pass leaves the library disagreeing with
-/// itself about who an artist is.
 pub(super) async fn update_title_artist_batch(
     db: &SqlitePool,
     rows: &[(String, Option<String>, Option<String>)],

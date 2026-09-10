@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 export type Lang = "ru" | "en" | "uk" | "be" | "kk";
 
@@ -13,27 +13,52 @@ export const LANGUAGES: { code: Lang; country: string; native: string }[] = [
 let lang: Lang = (localStorage.getItem("lang") as Lang | null) ?? "ru";
 const listeners = new Set<() => void>();
 
-export function useLangStore() {
-  const [, force] = useState(0);
-  useEffect(() => {
-    const cb = () => force((x) => x + 1);
-    listeners.add(cb);
-    return () => {
-      listeners.delete(cb);
-    };
-  }, []);
-  return {
-    lang,
-    setLang: (l: Lang) => {
-      lang = l;
-      localStorage.setItem("lang", l);
-      listeners.forEach((cb) => cb());
-    },
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
   };
 }
 
+function currentLang(): Lang {
+  return lang;
+}
+
+export function setLang(next: Lang) {
+  if (next === lang) {
+    return;
+  }
+  lang = next;
+  try {
+    localStorage.setItem("lang", next);
+  } catch {}
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+export function useLangStore() {
+  const current = useSyncExternalStore(subscribe, currentLang, currentLang);
+  return { lang: current, setLang };
+}
+
 const ru: Record<string, string> = {
+  "The track you play, shown in your profile": "Трек, что играет, виден в профиле",
+  "Steps aside while Telegram plays, then comes back": "Уходит на фон, пока звучит Telegram",
+  "This system cannot tell which app is making sound": "Система не говорит, кто издаёт звук",
+  "Opens fygram when you log in": "Открывать при входе в систему",
+  "Accent colour": "Цвет акцента",
+  Back: "Назад",
+  playing: "играет",
+  Playback: "Воспроизведение",
+  Window: "Окно",
+  Minimise: "Свернуть",
+  Maximise: "Развернуть",
+  Restore: "Свернуть в окно",
+  Close: "Закрыть",
+  "invisible name": "невидимое имя",
   "Set playlist cover…": "Выбрать обложку плейлиста…",
+  "Change playlist cover": "Сменить обложку плейлиста",
   "Remove playlist cover": "Убрать обложку плейлиста",
   "All tracks": "Все треки",
   Channels: "Каналы",
@@ -43,6 +68,8 @@ const ru: Record<string, string> = {
   "Sync now": "Синхронизировать",
   "Syncing…": "Синхронизация…",
   "New playlist": "Новый плейлист",
+  Name: "Название",
+  Create: "Создать",
   "Delete playlist": "Удалить плейлист",
   "Rename playlist": "Переименовать плейлист",
   "Playlist name…": "Название плейлиста…",
@@ -50,6 +77,8 @@ const ru: Record<string, string> = {
   "No playlists yet.": "Пока нет плейлистов.",
   "No artists yet.": "Пока нет артистов.",
   "Search artists…": "Поиск артистов…",
+  "Search channels…": "Поиск каналов…",
+  "Search playlists…": "Поиск плейлистов…",
   "No matches.": "Ничего не найдено.",
   "Search title, artist, album…": "Поиск по названию, артисту, альбому…",
   "Nothing here yet.": "Здесь пока ничего нет.",
@@ -66,6 +95,7 @@ const ru: Record<string, string> = {
   Channel: "Канал",
   Playlist: "Плейлист",
   Duration: "Длительность",
+  Added: "Добавлен",
   "Saving to Telegram…": "Сохраняем в телеграме…",
   "Save (re-uploads to Telegram)": "Сохранить (перезальёт файл в телеграм)",
   Shuffle: "Перемешать",
@@ -134,7 +164,7 @@ const ru: Record<string, string> = {
   "Checking…": "Проверка…",
   Confirm: "Подтвердить",
   "Add channels & groups": "Добавить каналы и группы",
-  Close: "Закрыть",
+  "Link or @username": "Ссылка или @имя",
   "Paste a t.me link or @username…": "Вставь ссылку t.me/… или @username…",
   Add: "Добавить",
   "Adding…": "Добавление…",
@@ -155,25 +185,47 @@ const ru: Record<string, string> = {
     "Синхронизация каналов через телеграм API — это то, чего не делают официальные клиенты, и в теории может привести к ограничениям на аккаунте. Не синхронизируйте слишком часто и добавляйте только каналы, которым доверяете.",
   "Switch to dark theme": "Переключить на тёмную тему",
   Theme: "Тема",
-  Language: "Язык",
-  "Copy user ID": "Скопировать ID",
-  Copied: "Скопировано",
   "Sync with profile": "Синхронизировать с профилем",
+  "Audio output": "Вывод звука",
+  "System default": "Системное устройство",
+  "No audio devices found.": "Аудиоустройств не найдено.",
+  Change: "Сменить",
+  "Show what is playing in your profile?": "Показывать в профиле, что играет?",
+  "Every track you have added to your profile will be removed. Only the one playing stays.":
+    "Все треки, что ты добавил в профиль, уберутся. Останется только тот, что играет.",
+  "Turn on": "Включить",
   "Launch at startup": "Запускать при старте системы",
-  "Automatically start the app when you log into your OS.":
-    "Автоматически запускать приложение при входе в систему.",
-  "Always open in fullscreen": "Всегда открывать в полноэкранном режиме",
   "Turn down while Telegram is playing": "Приглушать, пока играет Telegram",
-  "Drops the music to the background while anything plays in Telegram, and brings it back afterwards. It never stops.":
-    "Уводит музыку на задний план, пока в Telegram что-то играет, и возвращает после. Не останавливает.",
-  "This system can't tell which app is making sound.":
-    "Эта система не может сказать, какое приложение сейчас звучит.",
-  "Press F11 anytime to toggle fullscreen.": "Нажмите F11, чтобы переключить полноэкранный режим.",
   "Various artists": "Прочие авторы",
   "Merge similarly-spelled artist names (case, typos) into one":
     "Слить похожие по написанию имена артистов (регистр, опечатки) в одно",
   "Delete playlist?": "Удалить плейлист?",
   "Delete channel": "Удалить канал",
+  "Profile music": "Музыка в профиле",
+  "Added to": "Добавлено в",
+  recent: "часто",
+  Sync: "Обновить",
+  "Read from Telegram again": "Перечитать из Telegram",
+  "What is playing goes into the profile by itself.": "Играющий трек сам встаёт в профиль.",
+  "In the profile": "В профиле",
+  "Add music to the profile": "Добавить музыку в профиль",
+  "Nothing in the profile yet.": "В профиле пока пусто.",
+  "Asking Telegram what is there…": "Спрашиваем Telegram, что там…",
+  "Add from the library": "Добавить из библиотеки",
+  "Remove from the profile": "Убрать из профиля",
+  "Add to the profile": "Добавить в профиль",
+  "Already in the profile": "Уже в профиле",
+  "Added to the profile.": "Добавлено в профиль.",
+  "Taken out of the profile.": "Убрано из профиля.",
+  "Couldn't add to the profile:": "Не удалось добавить в профиль:",
+  "Search tracks…": "Поиск треков…",
+  "Loading…": "Загрузка…",
+  Untitled: "Без названия",
+  "Rename channel": "Переименовать канал",
+  "Channel picture": "Картинка канала",
+  "Channel picture updated.": "Картинка канала обновлена.",
+  "Couldn't rename the channel:": "Не удалось переименовать канал:",
+  "Couldn't change the picture:": "Не удалось сменить картинку:",
   "Delete channel?": "Удалить канал?",
   "The channel and its tracks will be removed from the library. Tracks saved in playlists stay.":
     "Канал и его треки будут удалены из библиотеки. Треки, сохранённые в плейлистах, останутся.",
@@ -185,13 +237,17 @@ const ru: Record<string, string> = {
   "Remove track from playlist?": "Удалить трек из плейлиста?",
   "Are you sure you want to remove this track from the playlist:":
     "Точно удалить этот трек из плейлиста:",
-  "Show your currently playing track in your Telegram profile.":
-    "Показывать играющий трек в профиле телеграма.",
   "Stop sync": "Остановить синхронизацию",
+  "Eco mode": "Эко-режим",
+  "No blur, no animation — uses far less memory": "Без размытия и анимации — заметно меньше памяти",
+  "Keep the artwork": "Оставить обложки",
+  "Covers are the costly half — initials stand in without them":
+    "Обложки — самая дорогая часть; без них показываются инициалы",
   "Free up space…": "Освободить место…",
   "Free up space": "Освободить место",
   "Freeing up space…": "Освобождаем место…",
   "Loading cache size…": "Считаем размер кэша…",
+  "fygram is taking {share} of this disk.": "fygram занимает {share} места на диске.",
   "Currently cached: {size} across {count} track(s).": "Сейчас в кэше: {size} ({count} треков).",
   "Deletes the least-played tracks' downloaded files first, up to the amount below. Nothing is removed from your library or playlists - a deleted file just re-downloads automatically the next time you play that track.":
     "Удаляет файлы самых редко прослушиваемых треков в первую очередь, пока не наберётся указанный объём. Из библиотеки и плейлистов ничего не пропадает — удалённый файл просто скачается заново, когда включишь этот трек снова.",
@@ -263,8 +319,10 @@ const ru: Record<string, string> = {
     "Недоступен — не удаётся получить чат или аудио источника",
   "Clear search field": "Очистить поле поиска",
   "Download music in the": "Скачать музыку можно в",
-  Appearance: "Оформление",
   Light: "Светлая",
+  Day: "Дневная",
+  Night: "Ночная",
+  Themes: "Темы",
   Dark: "Тёмная",
   Classic: "Классический",
   Blue: "Синий",
@@ -276,20 +334,11 @@ const ru: Record<string, string> = {
   Gray: "Серый",
   White: "Белый",
   "Custom color": "Свой цвет",
-  "Broadcast now playing…": "Транслировать, что играет…",
-  "Broadcast now playing": "Трансляция того, что играет",
-  "Sends what you're playing to a server you run, so a site can show it live and let visitors listen along. Off by default, and nothing is sent until you switch it on.":
-    "Отправляет то, что ты слушаешь, на твой сервер — чтобы сайт показывал это вживую, а гости могли слушать вместе с тобой. По умолчанию выключено, и пока не включишь, ничего не отправляется.",
-  "Server URL": "Адрес сервера",
   Token: "Токен",
   "stored — leave blank to keep it": "сохранён — оставь пустым, чтобы не менять",
-  "the server's BIO_TOKEN": "BIO_TOKEN с сервера",
-  "Broadcast while playing": "Транслировать во время прослушивания",
   "What exactly gets sent?": "Что именно отправляется?",
   "Every ~3 seconds while a track is playing — and immediately when you switch tracks — one request to":
     "Каждые ~3 секунды, пока играет трек, — и сразу при переключении — один запрос на",
-  "channel_id + message_id identify the audio file, so the server knows whether it already has it. It answers with the ones it's missing at":
-    "channel_id + message_id опознают аудиофайл, так что сервер понимает, есть ли он у него. В ответ он присылает те, которых не хватает, по",
   ", and only those are uploaded, once each, via":
     ", и только они загружаются, по одному разу каждый, через",
   "(the raw audio file, nothing else).": "(сам аудиофайл, и больше ничего).",
@@ -308,9 +357,6 @@ const ru: Record<string, string> = {
   GB: "ГБ",
   "Loading fygram…": "Загружаем fygram…",
   "e.g. 1234567": "например, 1234567",
-  "broadcasting “now playing”": "трансляция «сейчас играет»",
-  "fygram can push the track you are listening to at a server you run, so a site can show it live and let visitors listen along":
-    "fygram может отправлять трек, который ты слушаешь, на твой собственный сервер, чтобы сайт показывал его вживую и давал гостям слушать вместе с тобой",
   "off by default": "по умолчанию выключено",
   "nothing leaves your machine until you switch it on":
     "ничего не уходит с твоей машины, пока сам не включишь",
@@ -319,14 +365,7 @@ const ru: Record<string, string> = {
   field: "поле",
   "what it is": "что это",
   "base URL, no trailing slash": "базовый адрес, без слеша в конце",
-  "for a server on this machine, or your own public address":
-    "для сервера на этой же машине, либо твой публичный адрес",
-  "the shared secret your server checks. stored locally, never shown again.":
-    "общий секрет, который проверяет твой сервер. хранится локально и больше не показывается.",
   "the master switch": "главный выключатель",
-  "test connection calls GET /api/health without a token first, then makes one authorized request, so “the server is down” and “the token is wrong” come back as two different messages":
-    "«проверить соединение» сначала дёргает GET /api/health без токена, а потом делает один авторизованный запрос, поэтому «сервер лежит» и «токен неверный» возвращаются разными сообщениями",
-  "what your server has to implement": "что должен уметь твой сервер",
   "five endpoints. everything except health takes": "пять эндпоинтов. всё, кроме health, требует",
   method: "метод",
   path: "путь",
@@ -337,8 +376,6 @@ const ru: Record<string, string> = {
   "which files you still want": "какие файлы тебе ещё нужны",
   "the audio itself, once per track": "сам файл, один раз на трек",
   "1. the playhead": "1. позиция воспроизведения",
-  "duration and position are seconds. artist is empty when the file carries no artist tag. playing is false while paused, and a server keeping its own copy of the playhead should stop advancing it when it sees that.":
-    "duration и position — в секундах. artist пустой, если в файле нет тега исполнителя. playing равен false на паузе: сервер, который ведёт свою копию позиции, должен в этот момент перестать её двигать.",
   "a track change is reported the moment it happens, at position 0, without waiting for the next tick: someone joining right then starts at the top of the song rather than several seconds in":
     "смена трека уходит сразу же, с позицией 0, не дожидаясь следующего тика: тот, кто зашёл именно в этот момент, начинает с начала песни, а не с середины",
   "2. the audio file, once, and only if asked": "2. аудиофайл, один раз и только по запросу",
@@ -348,11 +385,7 @@ const ru: Record<string, string> = {
     "трек, который ещё не скачан локально, пропускается и остаётся в твоём списке ожидания, уйдёт на одном из следующих тиков. отдавать это аудио обратно с поддержкой HTTP Range нужно для того, чтобы сайт мог перематывать.",
   "3. stop, on pause, track end and quit": "3. стоп, на паузе, в конце трека и при выходе",
   "what is never sent": "что не отправляется никогда",
-  "your library listing, playlists, channel list, account details and session. only the fields above, for the one track playing right now.":
-    "список твоей библиотеки, плейлисты, список каналов, данные аккаунта и сессия. только поля выше и только для того трека, который играет прямо сейчас.",
   "when things break": "когда что-то ломается",
-  "every broadcast call swallows its own errors: an unreachable server, a wrong token or a rejected upload can never interrupt or degrade local playback. the next beat simply retries.":
-    "каждый вызов трансляции глотает свои ошибки: недоступный сервер, неверный токен или отклонённая загрузка не могут прервать или испортить локальное воспроизведение. следующий тик просто повторит попытку.",
   "a minimal receiver": "минимальный приёмник",
   "any language will do. the shape:": "язык любой. скелет такой:",
   "reject anything without the right bearer token on the four private routes, and keep /api/health open so Test connection can tell the two failures apart":
@@ -360,10 +393,6 @@ const ru: Record<string, string> = {
   "Read the documentation": "Открыть документацию",
   "Sync every playlist to Telegram": "Синхронизировать все плейлисты с Telegram",
   "Couldn't sync the playlists:": "Не удалось синхронизировать плейлисты:",
-  "copy prompt for ai": "скопировать промпт для ии",
-  copied: "скопировано",
-  "everything a model needs to write the receiving server, in english":
-    "всё, что нужно модели, чтобы написать принимающий сервер, на английском",
   Synced: "Синхронизировано",
   "Synced just now": "Синхронизировано только что",
   "Synced {n} min ago": "Синхронизировано {n} мин назад",
@@ -389,10 +418,15 @@ const ru: Record<string, string> = {
   "Rebuilds the folder tree so no directory holds more than 256 files":
     "Перестраивает дерево папок так, чтобы в каждой было не больше 256 файлов",
   "Keep the audio for": "Оставить музыку для",
+  Keeping: "Оставляем",
+  Freeing: "Освободим",
   "Also delete files that belong to no track": "Удалить и файлы, не привязанные ни к одному треку",
   "will be freed": "освободится",
   Staying: "Останется",
   "Leftover files": "Файлы без трека",
+  Other: "Другое",
+  Free: "Свободно",
+  "of this disk": "диска",
   "Songs stay in your playlists — only the audio goes, and it downloads again the next time you play it.":
     "Треки останутся в плейлистах — удаляются только файлы, они скачаются заново при следующем прослушивании.",
   Clear: "Очистить",
@@ -427,7 +461,22 @@ const ru: Record<string, string> = {
 };
 
 const uk: Record<string, string> = {
+  "The track you play, shown in your profile": "Трек, що грає, видно в профілі",
+  "Steps aside while Telegram plays, then comes back": "Іде на фон, поки звучить Telegram",
+  "This system cannot tell which app is making sound": "Система не каже, хто видає звук",
+  "Opens fygram when you log in": "Відкривати при вході в систему",
+  "Accent colour": "Колір акценту",
+  Back: "Назад",
+  playing: "грає",
+  Playback: "Відтворення",
+  Window: "Вікно",
+  Minimise: "Згорнути",
+  Maximise: "Розгорнути",
+  Restore: "Згорнути у вікно",
+  Close: "Закрити",
+  "invisible name": "невидиме ім'я",
   "Set playlist cover…": "Вибрати обкладинку плейлиста…",
+  "Change playlist cover": "Змінити обкладинку плейлиста",
   "Remove playlist cover": "Прибрати обкладинку плейлиста",
   "All tracks": "Усі треки",
   Channels: "Канали",
@@ -437,6 +486,8 @@ const uk: Record<string, string> = {
   "Sync now": "Синхронізувати",
   "Syncing…": "Синхронізація…",
   "New playlist": "Новий плейлист",
+  Name: "Назва",
+  Create: "Створити",
   "Delete playlist": "Видалити плейлист",
   "Rename playlist": "Перейменувати плейлист",
   "Playlist name…": "Назва плейлиста…",
@@ -444,6 +495,8 @@ const uk: Record<string, string> = {
   "No playlists yet.": "Поки немає плейлистів.",
   "No artists yet.": "Поки немає виконавців.",
   "Search artists…": "Пошук виконавців…",
+  "Search channels…": "Пошук каналів…",
+  "Search playlists…": "Пошук плейлистів…",
   "No matches.": "Нічого не знайдено.",
   "Search title, artist, album…": "Пошук за назвою, виконавцем, альбомом…",
   "Nothing here yet.": "Тут поки нічого немає.",
@@ -460,6 +513,7 @@ const uk: Record<string, string> = {
   Channel: "Канал",
   Playlist: "Плейлист",
   Duration: "Тривалість",
+  Added: "Додано",
   "Saving to Telegram…": "Зберігаємо в телеграмі…",
   "Save (re-uploads to Telegram)": "Зберегти (перезалиє файл у телеграм)",
   Shuffle: "Перемішати",
@@ -528,7 +582,7 @@ const uk: Record<string, string> = {
   "Checking…": "Перевірка…",
   Confirm: "Підтвердити",
   "Add channels & groups": "Додати канали та групи",
-  Close: "Закрити",
+  "Link or @username": "Посилання або @імʼя",
   "Paste a t.me link or @username…": "Встав посилання t.me/… або @username…",
   Add: "Додати",
   "Adding…": "Додавання…",
@@ -549,25 +603,47 @@ const uk: Record<string, string> = {
     "Синхронізація каналів через телеграм API — це те, чого не роблять офіційні клієнти, і теоретично може призвести до обмежень на акаунті. Не синхронізуйте занадто часто й додавайте лише ті канали, яким довіряєте.",
   "Switch to dark theme": "Перемкнути на темну тему",
   Theme: "Тема",
-  Language: "Мова",
-  "Copy user ID": "Скопіювати ID",
-  Copied: "Скопійовано",
   "Sync with profile": "Синхронізувати з профілем",
+  "Audio output": "Вивід звуку",
+  "System default": "Системний пристрій",
+  "No audio devices found.": "Аудіопристроїв не знайдено.",
+  Change: "Змінити",
+  "Show what is playing in your profile?": "Показувати в профілі, що грає?",
+  "Every track you have added to your profile will be removed. Only the one playing stays.":
+    "Усі треки, що ти додав у профіль, приберуться. Залишиться тільки той, що грає.",
+  "Turn on": "Увімкнути",
   "Launch at startup": "Запускати при старті системи",
-  "Automatically start the app when you log into your OS.":
-    "Автоматично запускати застосунок при вході в систему.",
-  "Always open in fullscreen": "Завжди відкривати в повноекранному режимі",
   "Turn down while Telegram is playing": "Приглушувати, поки грає Telegram",
-  "Drops the music to the background while anything plays in Telegram, and brings it back afterwards. It never stops.":
-    "Відводить музику на задній план, поки в Telegram щось грає, і повертає потім. Не зупиняє.",
-  "This system can't tell which app is making sound.":
-    "Ця система не може сказати, який застосунок зараз звучить.",
-  "Press F11 anytime to toggle fullscreen.": "Натисніть F11, щоб перемкнути повноекранний режим.",
   "Various artists": "Різні виконавці",
   "Merge similarly-spelled artist names (case, typos) into one":
     "Об'єднати схожі за написанням імена виконавців (регістр, помилки) в одне",
   "Delete playlist?": "Видалити плейлист?",
   "Delete channel": "Видалити канал",
+  "Profile music": "Музика в профілі",
+  "Added to": "Додано в",
+  recent: "часто",
+  Sync: "Оновити",
+  "Read from Telegram again": "Перечитати з Telegram",
+  "What is playing goes into the profile by itself.": "Трек, що грає, сам стає в профіль.",
+  "In the profile": "У профілі",
+  "Add music to the profile": "Додати музику в профіль",
+  "Nothing in the profile yet.": "У профілі поки порожньо.",
+  "Asking Telegram what is there…": "Питаємо Telegram, що там…",
+  "Add from the library": "Додати з бібліотеки",
+  "Remove from the profile": "Прибрати з профілю",
+  "Add to the profile": "Додати в профіль",
+  "Already in the profile": "Уже в профілі",
+  "Added to the profile.": "Додано в профіль.",
+  "Taken out of the profile.": "Прибрано з профілю.",
+  "Couldn't add to the profile:": "Не вдалося додати в профіль:",
+  "Search tracks…": "Пошук треків…",
+  "Loading…": "Завантаження…",
+  Untitled: "Без назви",
+  "Rename channel": "Перейменувати канал",
+  "Channel picture": "Картинка каналу",
+  "Channel picture updated.": "Картинку каналу оновлено.",
+  "Couldn't rename the channel:": "Не вдалося перейменувати канал:",
+  "Couldn't change the picture:": "Не вдалося змінити картинку:",
   "Delete channel?": "Видалити канал?",
   "The channel and its tracks will be removed from the library. Tracks saved in playlists stay.":
     "Канал і його треки буде видалено з бібліотеки. Треки, збережені в плейлистах, залишаться.",
@@ -579,13 +655,17 @@ const uk: Record<string, string> = {
   "Remove track from playlist?": "Видалити трек із плейлиста?",
   "Are you sure you want to remove this track from the playlist:":
     "Точно видалити цей трек із плейлиста:",
-  "Show your currently playing track in your Telegram profile.":
-    "Показувати трек, що грає, у профілі телеграма.",
   "Stop sync": "Зупинити синхронізацію",
+  "Eco mode": "Еко-режим",
+  "No blur, no animation — uses far less memory": "Без розмиття й анімації — помітно менше пам’яті",
+  "Keep the artwork": "Залишити обкладинки",
+  "Covers are the costly half — initials stand in without them":
+    "Обкладинки — найдорожча частина; без них показуються ініціали",
   "Free up space…": "Звільнити місце…",
   "Free up space": "Звільнити місце",
   "Freeing up space…": "Звільняємо місце…",
   "Loading cache size…": "Рахуємо розмір кешу…",
+  "fygram is taking {share} of this disk.": "fygram займає {share} місця на диску.",
   "Currently cached: {size} across {count} track(s).": "Зараз у кеші: {size} ({count} треків).",
   "Deletes the least-played tracks' downloaded files first, up to the amount below. Nothing is removed from your library or playlists - a deleted file just re-downloads automatically the next time you play that track.":
     "Видаляє файли найрідше прослуханих треків у першу чергу, доки не набереться вказаний обсяг. З бібліотеки та плейлистів нічого не зникає — видалений файл просто завантажиться знову, коли ввімкнеш цей трек знову.",
@@ -657,8 +737,10 @@ const uk: Record<string, string> = {
     "Недоступний — не вдається отримати чат або аудіо джерела",
   "Clear search field": "Очистити поле пошуку",
   "Download music in the": "Завантажити музику можна в",
-  Appearance: "Вигляд",
   Light: "Світла",
+  Day: "Денна",
+  Night: "Нічна",
+  Themes: "Теми",
   Dark: "Темна",
   Classic: "Класична",
   Blue: "Синій",
@@ -670,20 +752,11 @@ const uk: Record<string, string> = {
   Gray: "Сірий",
   White: "Білий",
   "Custom color": "Свій колір",
-  "Broadcast now playing…": "Транслювати, що грає…",
-  "Broadcast now playing": "Трансляція того, що грає",
-  "Sends what you're playing to a server you run, so a site can show it live and let visitors listen along. Off by default, and nothing is sent until you switch it on.":
-    "Надсилає те, що ти слухаєш, на твій сервер — щоб сайт показував це наживо, а гості могли слухати разом з тобою. Типово вимкнено, і поки не увімкнеш, нічого не надсилається.",
-  "Server URL": "Адреса сервера",
   Token: "Токен",
   "stored — leave blank to keep it": "збережений — залиш порожнім, щоб не міняти",
-  "the server's BIO_TOKEN": "BIO_TOKEN із сервера",
-  "Broadcast while playing": "Транслювати під час прослуховування",
   "What exactly gets sent?": "Що саме надсилається?",
   "Every ~3 seconds while a track is playing — and immediately when you switch tracks — one request to":
     "Кожні ~3 секунди, поки грає трек, — і одразу при перемиканні — один запит на",
-  "channel_id + message_id identify the audio file, so the server knows whether it already has it. It answers with the ones it's missing at":
-    "channel_id + message_id упізнають аудіофайл, тож сервер розуміє, чи він у нього вже є. У відповідь він надсилає ті, яких бракує, за",
   ", and only those are uploaded, once each, via":
     ", і лише вони завантажуються, по одному разу кожен, через",
   "(the raw audio file, nothing else).": "(сам аудіофайл, і більше нічого).",
@@ -702,9 +775,6 @@ const uk: Record<string, string> = {
   GB: "ГБ",
   "Loading fygram…": "Завантажуємо fygram…",
   "e.g. 1234567": "наприклад, 1234567",
-  "broadcasting “now playing”": "трансляція «зараз грає»",
-  "fygram can push the track you are listening to at a server you run, so a site can show it live and let visitors listen along":
-    "fygram може надсилати трек, який ти слухаєш, на твій власний сервер, щоб сайт показував його наживо й давав гостям слухати разом з тобою",
   "off by default": "типово вимкнено",
   "nothing leaves your machine until you switch it on":
     "нічого не покидає твою машину, доки сам не увімкнеш",
@@ -713,14 +783,7 @@ const uk: Record<string, string> = {
   field: "поле",
   "what it is": "що це",
   "base URL, no trailing slash": "базова адреса, без скісної риски в кінці",
-  "for a server on this machine, or your own public address":
-    "для сервера на цій самій машині, або твоя публічна адреса",
-  "the shared secret your server checks. stored locally, never shown again.":
-    "спільний секрет, який перевіряє твій сервер. зберігається локально й більше не показується.",
   "the master switch": "головний вимикач",
-  "test connection calls GET /api/health without a token first, then makes one authorized request, so “the server is down” and “the token is wrong” come back as two different messages":
-    "«перевірити з’єднання» спершу смикає GET /api/health без токена, а потім робить один авторизований запит, тому «сервер лежить» і «токен неправильний» повертаються різними повідомленнями",
-  "what your server has to implement": "що має вміти твій сервер",
   "five endpoints. everything except health takes": "п’ять ендпоінтів. усе, крім health, вимагає",
   method: "метод",
   path: "шлях",
@@ -731,8 +794,6 @@ const uk: Record<string, string> = {
   "which files you still want": "які файли тобі ще потрібні",
   "the audio itself, once per track": "сам файл, один раз на трек",
   "1. the playhead": "1. позиція відтворення",
-  "duration and position are seconds. artist is empty when the file carries no artist tag. playing is false while paused, and a server keeping its own copy of the playhead should stop advancing it when it sees that.":
-    "duration і position — у секундах. artist порожній, якщо у файлі немає тега виконавця. playing дорівнює false на паузі: сервер, який веде свою копію позиції, має в цей момент перестати її рухати.",
   "a track change is reported the moment it happens, at position 0, without waiting for the next tick: someone joining right then starts at the top of the song rather than several seconds in":
     "зміна треку йде одразу ж, з позицією 0, не чекаючи наступного тика: той, хто зайшов саме тоді, починає з початку пісні, а не з середини",
   "2. the audio file, once, and only if asked": "2. аудіофайл, один раз і тільки на запит",
@@ -742,11 +803,7 @@ const uk: Record<string, string> = {
     "трек, який ще не завантажено локально, пропускається й лишається у твоєму списку очікування, піде на одному з наступних тиків. віддавати це аудіо назад із підтримкою HTTP Range потрібно, щоб сайт міг перемотувати.",
   "3. stop, on pause, track end and quit": "3. стоп, на паузі, у кінці треку й при виході",
   "what is never sent": "що не надсилається ніколи",
-  "your library listing, playlists, channel list, account details and session. only the fields above, for the one track playing right now.":
-    "список твоєї бібліотеки, плейлисти, список каналів, дані акаунта й сесія. лише поля вище і лише для того треку, що грає просто зараз.",
   "when things break": "коли щось ламається",
-  "every broadcast call swallows its own errors: an unreachable server, a wrong token or a rejected upload can never interrupt or degrade local playback. the next beat simply retries.":
-    "кожен виклик трансляції ковтає свої помилки: недоступний сервер, невірний токен чи відхилене завантаження не можуть перервати або зіпсувати локальне відтворення. наступний тик просто повторить спробу.",
   "a minimal receiver": "мінімальний приймач",
   "any language will do. the shape:": "мова будь-яка. скелет такий:",
   "reject anything without the right bearer token on the four private routes, and keep /api/health open so Test connection can tell the two failures apart":
@@ -754,10 +811,6 @@ const uk: Record<string, string> = {
   "Read the documentation": "Відкрити документацію",
   "Sync every playlist to Telegram": "Синхронізувати всі плейлисти з Telegram",
   "Couldn't sync the playlists:": "Не вдалося синхронізувати плейлисти:",
-  "copy prompt for ai": "скопіювати промпт для ші",
-  copied: "скопійовано",
-  "everything a model needs to write the receiving server, in english":
-    "усе, що потрібно моделі, щоб написати сервер-приймач, англійською",
   Synced: "Синхронізовано",
   "Synced just now": "Синхронізовано щойно",
   "Synced {n} min ago": "Синхронізовано {n} хв тому",
@@ -783,10 +836,15 @@ const uk: Record<string, string> = {
   "Rebuilds the folder tree so no directory holds more than 256 files":
     "Перебудовує дерево тек так, щоб у кожній було не більше 256 файлів",
   "Keep the audio for": "Залишити музику для",
+  Keeping: "Залишаємо",
+  Freeing: "Звільнимо",
   "Also delete files that belong to no track": "Видалити й файли, не прив'язані до жодного треку",
   "will be freed": "звільниться",
   Staying: "Залишиться",
   "Leftover files": "Файли без треку",
+  Other: "Інше",
+  Free: "Вільно",
+  "of this disk": "диска",
   "Songs stay in your playlists — only the audio goes, and it downloads again the next time you play it.":
     "Треки залишаться в плейлистах — видаляються лише файли, вони завантажаться знову під час наступного прослуховування.",
   Clear: "Очистити",
@@ -821,7 +879,22 @@ const uk: Record<string, string> = {
 };
 
 const be: Record<string, string> = {
+  "The track you play, shown in your profile": "Трэк, што грае, відаць у профілі",
+  "Steps aside while Telegram plays, then comes back": "Ідзе на фон, пакуль гучыць Telegram",
+  "This system cannot tell which app is making sound": "Сістэма не кажа, хто выдае гук",
+  "Opens fygram when you log in": "Адкрываць пры ўваходзе ў сістэму",
+  "Accent colour": "Колер акцэнту",
+  Back: "Назад",
+  playing: "грае",
+  Playback: "Прайграванне",
+  Window: "Акно",
+  Minimise: "Згарнуць",
+  Maximise: "Разгарнуць",
+  Restore: "Згарнуць у акно",
+  Close: "Закрыць",
+  "invisible name": "нябачнае імя",
   "Set playlist cover…": "Выбраць вокладку плэйліста…",
+  "Change playlist cover": "Змяніць вокладку плэйліста",
   "Remove playlist cover": "Прыбраць вокладку плэйліста",
   "All tracks": "Усе трэкі",
   Channels: "Каналы",
@@ -831,6 +904,8 @@ const be: Record<string, string> = {
   "Sync now": "Сінхранізаваць",
   "Syncing…": "Сінхранізацыя…",
   "New playlist": "Новы плэйліст",
+  Name: "Назва",
+  Create: "Стварыць",
   "Delete playlist": "Выдаліць плэйліст",
   "Rename playlist": "Перайменаваць плэйліст",
   "Playlist name…": "Назва плэйліста…",
@@ -838,6 +913,8 @@ const be: Record<string, string> = {
   "No playlists yet.": "Пакуль няма плэйлістаў.",
   "No artists yet.": "Пакуль няма выканаўцаў.",
   "Search artists…": "Пошук выканаўцаў…",
+  "Search channels…": "Пошук каналаў…",
+  "Search playlists…": "Пошук плэйлістаў…",
   "No matches.": "Нічога не знойдзена.",
   "Search title, artist, album…": "Пошук па назве, выканаўцы, альбоме…",
   "Nothing here yet.": "Тут пакуль нічога няма.",
@@ -854,6 +931,7 @@ const be: Record<string, string> = {
   Channel: "Канал",
   Playlist: "Плэйліст",
   Duration: "Працягласць",
+  Added: "Дададзена",
   "Saving to Telegram…": "Захоўваем у тэлеграме…",
   "Save (re-uploads to Telegram)": "Захаваць (пераадправіць файл у тэлеграм)",
   Shuffle: "Перамяшаць",
@@ -922,7 +1000,7 @@ const be: Record<string, string> = {
   "Checking…": "Праверка…",
   Confirm: "Пацвердзіць",
   "Add channels & groups": "Дадаць каналы і групы",
-  Close: "Закрыць",
+  "Link or @username": "Спасылка або @імя",
   "Paste a t.me link or @username…": "Устаў спасылку t.me/… або @username…",
   Add: "Дадаць",
   "Adding…": "Даданне…",
@@ -943,25 +1021,47 @@ const be: Record<string, string> = {
     "Сінхранізацыя каналаў праз тэлеграм API — гэта тое, чаго не робяць афіцыйныя кліенты, і тэарэтычна можа прывесці да абмежаванняў на акаунце. Не сінхранізуйце занадта часта і дадавайце толькі тыя каналы, якім давяраеце.",
   "Switch to dark theme": "Пераключыць на цёмную тэму",
   Theme: "Тэма",
-  Language: "Мова",
-  "Copy user ID": "Скапіяваць ID",
-  Copied: "Скапіявана",
   "Sync with profile": "Сінхранізаваць з профілем",
+  "Audio output": "Вывад гуку",
+  "System default": "Сістэмная прылада",
+  "No audio devices found.": "Аўдыяпрылад не знойдзена.",
+  Change: "Змяніць",
+  "Show what is playing in your profile?": "Паказваць у профілі, што грае?",
+  "Every track you have added to your profile will be removed. Only the one playing stays.":
+    "Усе трэкі, што ты дадаў у профіль, прыбяруцца. Застанецца толькі той, што грае.",
+  "Turn on": "Уключыць",
   "Launch at startup": "Запускаць пры старце сістэмы",
-  "Automatically start the app when you log into your OS.":
-    "Аўтаматычна запускаць праграму пры ўваходзе ў сістэму.",
-  "Always open in fullscreen": "Заўсёды адкрываць у поўнаэкранным рэжыме",
   "Turn down while Telegram is playing": "Прыглушаць, пакуль грае Telegram",
-  "Drops the music to the background while anything plays in Telegram, and brings it back afterwards. It never stops.":
-    "Адводзіць музыку на задні план, пакуль у Telegram нешта грае, і вяртае пасля. Не спыняе.",
-  "This system can't tell which app is making sound.":
-    "Гэта сістэма не можа сказаць, якая праграма зараз гучыць.",
-  "Press F11 anytime to toggle fullscreen.": "Націсніце F11, каб пераключыць поўнаэкранны рэжым.",
   "Various artists": "Розныя выканаўцы",
   "Merge similarly-spelled artist names (case, typos) into one":
     "Аб'яднаць падобныя па напісанні імёны выканаўцаў (рэгістр, апечаткі) у адно",
   "Delete playlist?": "Выдаліць плэйліст?",
   "Delete channel": "Выдаліць канал",
+  "Profile music": "Музыка ў профілі",
+  "Added to": "Дададзена ў",
+  recent: "часта",
+  Sync: "Абнавіць",
+  "Read from Telegram again": "Перачытаць з Telegram",
+  "What is playing goes into the profile by itself.": "Трэк, які грае, сам становіцца ў профіль.",
+  "In the profile": "У профілі",
+  "Add music to the profile": "Дадаць музыку ў профіль",
+  "Nothing in the profile yet.": "У профілі пакуль пуста.",
+  "Asking Telegram what is there…": "Пытаемся ў Telegram, што там…",
+  "Add from the library": "Дадаць з бібліятэкі",
+  "Remove from the profile": "Прыбраць з профілю",
+  "Add to the profile": "Дадаць у профіль",
+  "Already in the profile": "Ужо ў профілі",
+  "Added to the profile.": "Дададзена ў профіль.",
+  "Taken out of the profile.": "Прыбрана з профілю.",
+  "Couldn't add to the profile:": "Не атрымалася дадаць у профіль:",
+  "Search tracks…": "Пошук трэкаў…",
+  "Loading…": "Загрузка…",
+  Untitled: "Без назвы",
+  "Rename channel": "Перайменаваць канал",
+  "Channel picture": "Карцінка канала",
+  "Channel picture updated.": "Карцінка канала абноўлена.",
+  "Couldn't rename the channel:": "Не атрымалася перайменаваць канал:",
+  "Couldn't change the picture:": "Не атрымалася змяніць карцінку:",
   "Delete channel?": "Выдаліць канал?",
   "The channel and its tracks will be removed from the library. Tracks saved in playlists stay.":
     "Канал і яго трэкі будуць выдаленыя з бібліятэкі. Трэкі, захаваныя ў плэйлістах, застануцца.",
@@ -973,13 +1073,17 @@ const be: Record<string, string> = {
   "Remove track from playlist?": "Выдаліць трэк з плэйліста?",
   "Are you sure you want to remove this track from the playlist:":
     "Дакладна выдаліць гэты трэк з плэйліста:",
-  "Show your currently playing track in your Telegram profile.":
-    "Паказваць трэк, які грае, у профілі тэлеграма.",
   "Stop sync": "Спыніць сінхранізацыю",
+  "Eco mode": "Эка-рэжым",
+  "No blur, no animation — uses far less memory": "Без размыцця і анімацыі — прыкметна менш памяці",
+  "Keep the artwork": "Пакінуць вокладкі",
+  "Covers are the costly half — initials stand in without them":
+    "Вокладкі — самая дарагая частка; без іх паказваюцца ініцыялы",
   "Free up space…": "Вызваліць месца…",
   "Free up space": "Вызваліць месца",
   "Freeing up space…": "Вызваляем месца…",
   "Loading cache size…": "Лічым памер кэшу…",
+  "fygram is taking {share} of this disk.": "fygram займае {share} месца на дыску.",
   "Currently cached: {size} across {count} track(s).": "Зараз у кэшы: {size} ({count} трэкаў).",
   "Deletes the least-played tracks' downloaded files first, up to the amount below. Nothing is removed from your library or playlists - a deleted file just re-downloads automatically the next time you play that track.":
     "Выдаляе файлы найрэдзей праслуханых трэкаў у першую чаргу, пакуль не набярэцца ўказаны аб'ём. З бібліятэкі і плэйлістаў нічога не знікае — выдалены файл проста загрузіцца зноў, калі ўключыш гэты трэк зноў.",
@@ -1051,8 +1155,10 @@ const be: Record<string, string> = {
     "Недаступны — не ўдаецца атрымаць чат або аўдыё крыніцы",
   "Clear search field": "Ачысціць поле пошуку",
   "Download music in the": "Спампаваць музыку можна ў",
-  Appearance: "Выгляд",
   Light: "Светлая",
+  Day: "Дзённая",
+  Night: "Начная",
+  Themes: "Тэмы",
   Dark: "Цёмная",
   Classic: "Класічная",
   Blue: "Сіні",
@@ -1064,20 +1170,11 @@ const be: Record<string, string> = {
   Gray: "Шэры",
   White: "Белы",
   "Custom color": "Свой колер",
-  "Broadcast now playing…": "Трансляваць, што грае…",
-  "Broadcast now playing": "Трансляцыя таго, што грае",
-  "Sends what you're playing to a server you run, so a site can show it live and let visitors listen along. Off by default, and nothing is sent until you switch it on.":
-    "Дасылае тое, што ты слухаеш, на твой сервер — каб сайт паказваў гэта ўжывую, а госці маглі слухаць разам з табой. Тыпова выключана, і пакуль не ўключыш, нічога не дасылаецца.",
-  "Server URL": "Адрас сервера",
   Token: "Токен",
   "stored — leave blank to keep it": "захаваны — пакінь пустым, каб не мяняць",
-  "the server's BIO_TOKEN": "BIO_TOKEN з сервера",
-  "Broadcast while playing": "Трансляваць падчас праслухоўвання",
   "What exactly gets sent?": "Што менавіта дасылаецца?",
   "Every ~3 seconds while a track is playing — and immediately when you switch tracks — one request to":
     "Кожныя ~3 секунды, пакуль грае трэк, — і адразу пры пераключэнні — адзін запыт на",
-  "channel_id + message_id identify the audio file, so the server knows whether it already has it. It answers with the ones it's missing at":
-    "channel_id + message_id пазнаюць аўдыёфайл, так што сервер разумее, ці ёсць ён у яго. У адказ ён дасылае тыя, якіх не хапае, па",
   ", and only those are uploaded, once each, via":
     ", і толькі яны загружаюцца, па адным разе кожны, праз",
   "(the raw audio file, nothing else).": "(сам аўдыёфайл, і больш нічога).",
@@ -1096,9 +1193,6 @@ const be: Record<string, string> = {
   GB: "ГБ",
   "Loading fygram…": "Загружаем fygram…",
   "e.g. 1234567": "напрыклад, 1234567",
-  "broadcasting “now playing”": "трансляцыя «зараз грае»",
-  "fygram can push the track you are listening to at a server you run, so a site can show it live and let visitors listen along":
-    "fygram можа адпраўляць трэк, які ты слухаеш, на твой уласны сервер, каб сайт паказваў яго ў жывым эфіры і даваў гасцям слухаць разам з табой",
   "off by default": "па змаўчанні выключана",
   "nothing leaves your machine until you switch it on":
     "нічога не пакідае тваю машыну, пакуль сам не ўключыш",
@@ -1107,14 +1201,7 @@ const be: Record<string, string> = {
   field: "поле",
   "what it is": "што гэта",
   "base URL, no trailing slash": "базавы адрас, без скосу ў канцы",
-  "for a server on this machine, or your own public address":
-    "для сервера на гэтай жа машыне, альбо твой публічны адрас",
-  "the shared secret your server checks. stored locally, never shown again.":
-    "агульны сакрэт, які правярае твой сервер. захоўваецца лакальна і больш не паказваецца.",
   "the master switch": "галоўны выключальнік",
-  "test connection calls GET /api/health without a token first, then makes one authorized request, so “the server is down” and “the token is wrong” come back as two different messages":
-    "«праверыць злучэнне» спачатку тузае GET /api/health без токена, а потым робіць адзін аўтарызаваны запыт, таму «сервер ляжыць» і «токен няправільны» вяртаюцца рознымі паведамленнямі",
-  "what your server has to implement": "што павінен умець твой сервер",
   "five endpoints. everything except health takes": "пяць эндпойнтаў. усё, акрамя health, патрабуе",
   method: "метад",
   path: "шлях",
@@ -1125,8 +1212,6 @@ const be: Record<string, string> = {
   "which files you still want": "якія файлы табе яшчэ патрэбныя",
   "the audio itself, once per track": "сам файл, адзін раз на трэк",
   "1. the playhead": "1. пазіцыя прайгравання",
-  "duration and position are seconds. artist is empty when the file carries no artist tag. playing is false while paused, and a server keeping its own copy of the playhead should stop advancing it when it sees that.":
-    "duration і position — у секундах. artist пусты, калі ў файле няма тэга выканаўцы. playing роўны false на паўзе: сервер, які вядзе сваю копію пазіцыі, павінен у гэты момант перастаць яе рухаць.",
   "a track change is reported the moment it happens, at position 0, without waiting for the next tick: someone joining right then starts at the top of the song rather than several seconds in":
     "змена трэка сыходзіць адразу ж, з пазіцыяй 0, не чакаючы наступнага ціку: той, хто зайшоў якраз тады, пачынае з пачатку песні, а не з сярэдзіны",
   "2. the audio file, once, and only if asked": "2. аўдыёфайл, адзін раз і толькі па запыце",
@@ -1136,11 +1221,7 @@ const be: Record<string, string> = {
     "трэк, які яшчэ не спампаваны лакальна, прапускаецца і застаецца ў тваім спісе чакання, сыдзе на адным з наступных цікаў. аддаваць гэтае аўдыё назад з падтрымкай HTTP Range трэба, каб сайт мог пераматваць.",
   "3. stop, on pause, track end and quit": "3. стоп, на паўзе, у канцы трэка і пры выхадзе",
   "what is never sent": "што не адпраўляецца ніколі",
-  "your library listing, playlists, channel list, account details and session. only the fields above, for the one track playing right now.":
-    "спіс тваёй бібліятэкі, плэйлісты, спіс каналаў, дадзеныя акаўнта і сесія. толькі палі вышэй і толькі для таго трэка, які грае проста зараз.",
   "when things break": "калі нешта ламаецца",
-  "every broadcast call swallows its own errors: an unreachable server, a wrong token or a rejected upload can never interrupt or degrade local playback. the next beat simply retries.":
-    "кожны выклік трансляцыі глытае свае памылкі: недаступны сервер, няправільны токен ці адхіленая загрузка не могуць перапыніць або сапсаваць лакальнае прайграванне. наступны цік проста паўторыць спробу.",
   "a minimal receiver": "мінімальны прыёмнік",
   "any language will do. the shape:": "мова любая. шкілет такі:",
   "reject anything without the right bearer token on the four private routes, and keep /api/health open so Test connection can tell the two failures apart":
@@ -1148,10 +1229,6 @@ const be: Record<string, string> = {
   "Read the documentation": "Адкрыць дакументацыю",
   "Sync every playlist to Telegram": "Сінхранізаваць усе плэйлісты з Telegram",
   "Couldn't sync the playlists:": "Не атрымалася сінхранізаваць плэйлісты:",
-  "copy prompt for ai": "скапіраваць промпт для іі",
-  copied: "скапіравана",
-  "everything a model needs to write the receiving server, in english":
-    "усё, што трэба мадэлі, каб напісаць сервер-прыёмнік, па-англійску",
   Synced: "Сінхранізавана",
   "Synced just now": "Сінхранізавана толькі што",
   "Synced {n} min ago": "Сінхранізавана {n} хв таму",
@@ -1177,10 +1254,15 @@ const be: Record<string, string> = {
   "Rebuilds the folder tree so no directory holds more than 256 files":
     "Перабудоўвае дрэва папак так, каб у кожнай было не больш за 256 файлаў",
   "Keep the audio for": "Пакінуць музыку для",
+  Keeping: "Пакідаем",
+  Freeing: "Вызвалім",
   "Also delete files that belong to no track": "Выдаліць і файлы, не прывязаныя ні да аднаго трэка",
   "will be freed": "вызваліцца",
   Staying: "Застанецца",
   "Leftover files": "Файлы без трэка",
+  Other: "Іншае",
+  Free: "Вольна",
+  "of this disk": "дыска",
   "Songs stay in your playlists — only the audio goes, and it downloads again the next time you play it.":
     "Трэкі застануцца ў плэйлістах — выдаляюцца толькі файлы, яны спампуюцца зноў пры наступным праслухоўванні.",
   Clear: "Ачысціць",
@@ -1215,7 +1297,22 @@ const be: Record<string, string> = {
 };
 
 const kk: Record<string, string> = {
+  "The track you play, shown in your profile": "Ойнап тұрған трек профильде көрінеді",
+  "Steps aside while Telegram plays, then comes back": "Telegram дыбысы кезінде артқа шегінеді",
+  "This system cannot tell which app is making sound": "Жүйе дыбысты кім шығарғанын айтпайды",
+  "Opens fygram when you log in": "Жүйеге кіргенде ашылады",
+  "Accent colour": "Акцент түсі",
+  Back: "Артқа",
+  playing: "ойнап тұр",
+  Playback: "Ойнату",
+  Window: "Терезе",
+  Minimise: "Жию",
+  Maximise: "Жаю",
+  Restore: "Терезеге келтіру",
+  Close: "Жабу",
+  "invisible name": "көрінбейтін аты",
   "Set playlist cover…": "Ойнату тізімінің мұқабасын таңдау…",
+  "Change playlist cover": "Ойнату тізімінің мұқабасын ауыстыру",
   "Remove playlist cover": "Ойнату тізімінің мұқабасын алып тастау",
   "All tracks": "Барлық тректер",
   Channels: "Арналар",
@@ -1225,6 +1322,8 @@ const kk: Record<string, string> = {
   "Sync now": "Синхрондау",
   "Syncing…": "Синхрондау…",
   "New playlist": "Жаңа ойнату тізімі",
+  Name: "Атауы",
+  Create: "Жасау",
   "Delete playlist": "Ойнату тізімін жою",
   "Rename playlist": "Ойнату тізімінің атын өзгерту",
   "Playlist name…": "Ойнату тізімінің атауы…",
@@ -1232,6 +1331,8 @@ const kk: Record<string, string> = {
   "No playlists yet.": "Әзірге ойнату тізімдері жоқ.",
   "No artists yet.": "Әзірге орындаушылар жоқ.",
   "Search artists…": "Орындаушыларды іздеу…",
+  "Search channels…": "Арналарды іздеу…",
+  "Search playlists…": "Ойнату тізімдерін іздеу…",
   "No matches.": "Ештеңе табылмады.",
   "Search title, artist, album…": "Атауы, орындаушысы, альбомы бойынша іздеу…",
   "Nothing here yet.": "Мұнда әзірге ештеңе жоқ.",
@@ -1248,6 +1349,7 @@ const kk: Record<string, string> = {
   Channel: "Арна",
   Playlist: "Ойнату тізімі",
   Duration: "Ұзақтығы",
+  Added: "Қосылды",
   "Saving to Telegram…": "Телеграмға сақтап жатыр…",
   "Save (re-uploads to Telegram)": "Сақтау (файлды телеграмға қайта жібереді)",
   Shuffle: "Аралас",
@@ -1316,7 +1418,7 @@ const kk: Record<string, string> = {
   "Checking…": "Тексерілуде…",
   Confirm: "Растау",
   "Add channels & groups": "Арналар мен топтарды қосу",
-  Close: "Жабу",
+  "Link or @username": "Сілтеме немесе @аты",
   "Paste a t.me link or @username…": "t.me/… сілтемесін немесе @username енгізіңіз…",
   Add: "Қосу",
   "Adding…": "Қосылуда…",
@@ -1337,25 +1439,47 @@ const kk: Record<string, string> = {
     "Телеграм API арқылы өз аккаунтыңыздың арналарын синхрондау — ресми клиенттер істемейтін нәрсе, теориялық тұрғыда аккаунтқа шектеу түсуі мүмкін. Синхрондау жиілігін шамадан тыс жиі етпеңіз және тек сенімді арналарды ғана қосыңыз.",
   "Switch to dark theme": "Қараңғы тақырыпқа ауысу",
   Theme: "Тақырып",
-  Language: "Тіл",
-  "Copy user ID": "ID көшіру",
-  Copied: "Көшірілді",
   "Sync with profile": "Профильмен синхрондау",
+  "Audio output": "Дыбыс шығысы",
+  "System default": "Жүйелік құрылғы",
+  "No audio devices found.": "Аудиоқұрылғы табылмады.",
+  Change: "Ауыстыру",
+  "Show what is playing in your profile?": "Профильде не ойнап тұрғанын көрсету керек пе?",
+  "Every track you have added to your profile will be removed. Only the one playing stays.":
+    "Профильге қосқан барлық трегің алынады. Тек ойнап тұрғаны қалады.",
+  "Turn on": "Қосу",
   "Launch at startup": "Жүйе іске қосылғанда автоматты түрде іске қосу",
-  "Automatically start the app when you log into your OS.":
-    "Жүйеге кіргенде қолданбаны автоматты түрде іске қосу.",
-  "Always open in fullscreen": "Әрқашан толық экранда ашу",
   "Turn down while Telegram is playing": "Telegram ойнап тұрғанда бәсеңдету",
-  "Drops the music to the background while anything plays in Telegram, and brings it back afterwards. It never stops.":
-    "Telegram-да бірдеңе ойнап тұрғанда музыканы артқы планға шығарады, содан кейін қайтарады. Тоқтатпайды.",
-  "This system can't tell which app is making sound.":
-    "Бұл жүйе қай қолданба дыбыс шығарып жатқанын айта алмайды.",
-  "Press F11 anytime to toggle fullscreen.": "Толық экранды қосу/өшіру үшін F11 басыңыз.",
   "Various artists": "Түрлі орындаушылар",
   "Merge similarly-spelled artist names (case, typos) into one":
     "Жазылуы ұқсас орындаушы аттарын (регистр, қателер) бірге біріктіру",
   "Delete playlist?": "Ойнату тізімін жою керек пе?",
   "Delete channel": "Арнаны жою",
+  "Profile music": "Профильдегі музыка",
+  "Added to": "Қосылды:",
+  recent: "жиі",
+  Sync: "Жаңарту",
+  "Read from Telegram again": "Telegram-нан қайта оқу",
+  "What is playing goes into the profile by itself.": "Ойнап тұрған трек профильге өзі қойылады.",
+  "In the profile": "Профильде",
+  "Add music to the profile": "Профильге музыка қосу",
+  "Nothing in the profile yet.": "Профильде әзірге бос.",
+  "Asking Telegram what is there…": "Telegram-нан сұрап жатырмыз…",
+  "Add from the library": "Кітапханадан қосу",
+  "Remove from the profile": "Профильден алып тастау",
+  "Add to the profile": "Профильге қосу",
+  "Already in the profile": "Профильде бар",
+  "Added to the profile.": "Профильге қосылды.",
+  "Taken out of the profile.": "Профильден алынды.",
+  "Couldn't add to the profile:": "Профильге қосу мүмкін болмады:",
+  "Search tracks…": "Тректерді іздеу…",
+  "Loading…": "Жүктелуде…",
+  Untitled: "Атауы жоқ",
+  "Rename channel": "Арнаның атын өзгерту",
+  "Channel picture": "Арна суреті",
+  "Channel picture updated.": "Арна суреті жаңартылды.",
+  "Couldn't rename the channel:": "Арнаның атын өзгерту мүмкін болмады:",
+  "Couldn't change the picture:": "Суретті ауыстыру мүмкін болмады:",
   "Delete channel?": "Арнаны жою керек пе?",
   "The channel and its tracks will be removed from the library. Tracks saved in playlists stay.":
     "Арна және оның тректері кітапханадан жойылады. Ойнату тізімдеріне сақталған тректер қалады.",
@@ -1367,13 +1491,17 @@ const kk: Record<string, string> = {
   "Remove track from playlist?": "Тректі ойнату тізімінен өшіру керек пе?",
   "Are you sure you want to remove this track from the playlist:":
     "Осы тректі ойнату тізімінен шынымен өшіргіңіз келе ме:",
-  "Show your currently playing track in your Telegram profile.":
-    "Ойнап тұрған тректі телеграм профилінде көрсету.",
   "Stop sync": "Синхрондауды тоқтату",
+  "Eco mode": "Үнемді режим",
+  "No blur, no animation — uses far less memory": "Бұлдырсыз, анимациясыз — жады әлдеқайда аз",
+  "Keep the artwork": "Мұқабаларды қалдыру",
+  "Covers are the costly half — initials stand in without them":
+    "Мұқаба — ең қымбат бөлігі; онсыз аты-жөні әріптері көрсетіледі",
   "Free up space…": "Орын босату…",
   "Free up space": "Орын босату",
   "Freeing up space…": "Орын босатылуда…",
   "Loading cache size…": "Кэш көлемі есептелуде…",
+  "fygram is taking {share} of this disk.": "fygram дискінің {share} орнын алып тұр.",
   "Currently cached: {size} across {count} track(s).": "Қазір кэште: {size} ({count} трек).",
   "Deletes the least-played tracks' downloaded files first, up to the amount below. Nothing is removed from your library or playlists - a deleted file just re-downloads automatically the next time you play that track.":
     "Ең сирек ойналған тректердің жүктелген файлдарын бірінші болып жояды, төмендегі көлемге жеткенше. Кітапханадан немесе ойнату тізімдерінен ештеңе жойылмайды — жойылған файл осы тректі келесі ойнатқанда автоматты түрде қайта жүктеледі.",
@@ -1447,8 +1575,10 @@ const kk: Record<string, string> = {
     "Қолжетімсіз — бастапқы чатқа немесе аудиоға қол жеткізу мүмкін емес",
   "Clear search field": "Іздеу өрісін тазарту",
   "Download music in the": "Музыканы ботта жүктеп алуға",
-  Appearance: "Сыртқы түрі",
   Light: "Ашық",
+  Day: "Күндізгі",
+  Night: "Түнгі",
+  Themes: "Тақырыптар",
   Dark: "Қараңғы",
   Classic: "Классикалық",
   Blue: "Көк",
@@ -1460,20 +1590,11 @@ const kk: Record<string, string> = {
   Gray: "Сұр",
   White: "Ақ",
   "Custom color": "Өз түсі",
-  "Broadcast now playing…": "Ойнап тұрғанын тарату…",
-  "Broadcast now playing": "Ойнап тұрғанын тарату",
-  "Sends what you're playing to a server you run, so a site can show it live and let visitors listen along. Off by default, and nothing is sent until you switch it on.":
-    "Сен тыңдап жатқаныңды өз серверіңе жібереді — сайт оны тікелей көрсете алады, ал қонақтар бірге тыңдай алады. Әдепкіде өшірулі, қоспайынша ештеңе жіберілмейді.",
-  "Server URL": "Сервер мекенжайы",
   Token: "Токен",
   "stored — leave blank to keep it": "сақталған — өзгертпеу үшін бос қалдыр",
-  "the server's BIO_TOKEN": "серверден алынған BIO_TOKEN",
-  "Broadcast while playing": "Ойнап тұрғанда тарату",
   "What exactly gets sent?": "Нақты не жіберіледі?",
   "Every ~3 seconds while a track is playing — and immediately when you switch tracks — one request to":
     "Трек ойнап тұрғанда әр ~3 секунд сайын — және трек ауысқанда бірден — мына мекенжайға бір сұраныс:",
-  "channel_id + message_id identify the audio file, so the server knows whether it already has it. It answers with the ones it's missing at":
-    "channel_id + message_id аудиофайлды танытады, сондықтан сервер оның бар-жоғын біледі. Жауап ретінде ол жетпейтіндерін мына жерде береді:",
   ", and only those are uploaded, once each, via":
     ", және тек солар бір реттен мына арқылы жүктеледі:",
   "(the raw audio file, nothing else).": "(таза аудиофайл, басқа ештеңе жоқ).",
@@ -1492,9 +1613,6 @@ const kk: Record<string, string> = {
   GB: "ГБ",
   "Loading fygram…": "fygram жүктелуде…",
   "e.g. 1234567": "мысалы, 1234567",
-  "broadcasting “now playing”": "«қазір ойнап тұр» трансляциясы",
-  "fygram can push the track you are listening to at a server you run, so a site can show it live and let visitors listen along":
-    "fygram сен тыңдап отырған тректі өз серверіңе жібере алады, сайт оны тікелей көрсетіп, қонақтарға бірге тыңдауға мүмкіндік береді",
   "off by default": "әдепкіде өшірулі",
   "nothing leaves your machine until you switch it on":
     "өзің қоспайынша, ештеңе құрылғыңнан шықпайды",
@@ -1503,14 +1621,7 @@ const kk: Record<string, string> = {
   field: "өріс",
   "what it is": "бұл не",
   "base URL, no trailing slash": "негізгі мекенжай, соңында қиғаш сызықсыз",
-  "for a server on this machine, or your own public address":
-    "осы құрылғыдағы сервер үшін немесе өзіңнің жария мекенжайың",
-  "the shared secret your server checks. stored locally, never shown again.":
-    "серверің тексеретін ортақ құпия. жергілікті сақталады және қайта көрсетілмейді.",
   "the master switch": "басты қосқыш",
-  "test connection calls GET /api/health without a token first, then makes one authorized request, so “the server is down” and “the token is wrong” come back as two different messages":
-    "«байланысты тексеру» алдымен токенсіз GET /api/health шақырады, содан кейін бір авторизацияланған сұраныс жасайды, сондықтан «сервер жоқ» пен «токен қате» бөлек хабарлама болып қайтады",
-  "what your server has to implement": "сенің серверің не істей білуі керек",
   "five endpoints. everything except health takes":
     "бес эндпоинт. health-тен басқасының бәрі мынаны талап етеді",
   method: "әдіс",
@@ -1522,8 +1633,6 @@ const kk: Record<string, string> = {
   "which files you still want": "саған әлі қандай файлдар керек",
   "the audio itself, once per track": "файлдың өзі, әр трекке бір рет",
   "1. the playhead": "1. ойнау орны",
-  "duration and position are seconds. artist is empty when the file carries no artist tag. playing is false while paused, and a server keeping its own copy of the playhead should stop advancing it when it sees that.":
-    "duration мен position — секундпен. Файлда орындаушы тегі болмаса, artist бос. Кідірісте playing false болады: өз позиция көшірмесін жүргізетін сервер оны сол сәтте жылжытуды тоқтатуы керек.",
   "a track change is reported the moment it happens, at position 0, without waiting for the next tick: someone joining right then starts at the top of the song rather than several seconds in":
     "трек ауысқаны келесі тікті күтпей, дәл сол сәтте 0 позициясымен жіберіледі: дәл сонда кірген адам әннің ортасынан емес, басынан бастайды",
   "2. the audio file, once, and only if asked": "2. аудиофайл, бір рет және тек сұраныс бойынша",
@@ -1533,11 +1642,7 @@ const kk: Record<string, string> = {
     "әлі жергілікті жүктелмеген трек өткізіліп, күту тізімінде қалады да, келесі тіктердің бірінде жіберіледі. сайт алға-артқа айналдыра алуы үшін бұл аудионы HTTP Range қолдауымен қайтару керек.",
   "3. stop, on pause, track end and quit": "3. тоқтату, кідірісте, трек біткенде және шыққанда",
   "what is never sent": "ешқашан жіберілмейтін нәрсе",
-  "your library listing, playlists, channel list, account details and session. only the fields above, for the one track playing right now.":
-    "кітапхана тізімі, ойнату тізімдері, арналар тізімі, аккаунт деректері мен сессия. тек жоғарыдағы өрістер және тек дәл қазір ойнап тұрған трек үшін.",
   "when things break": "бірдеңе бұзылғанда",
-  "every broadcast call swallows its own errors: an unreachable server, a wrong token or a rejected upload can never interrupt or degrade local playback. the next beat simply retries.":
-    "әр трансляция шақыруы өз қателерін жұтады: қолжетімсіз сервер, қате токен немесе қабылданбаған жүктеме жергілікті ойнатуды үзе де, нашарлата да алмайды. келесі тік жай ғана қайталайды.",
   "a minimal receiver": "ең қарапайым қабылдағыш",
   "any language will do. the shape:": "тілі кез келген. қаңқасы мынадай:",
   "reject anything without the right bearer token on the four private routes, and keep /api/health open so Test connection can tell the two failures apart":
@@ -1545,10 +1650,6 @@ const kk: Record<string, string> = {
   "Read the documentation": "Құжаттаманы ашу",
   "Sync every playlist to Telegram": "Барлық ойнату тізімін Telegram-мен синхрондау",
   "Couldn't sync the playlists:": "Ойнату тізімдерін синхрондау мүмкін болмады:",
-  "copy prompt for ai": "жасанды интеллектке промпт көшіру",
-  copied: "көшірілді",
-  "everything a model needs to write the receiving server, in english":
-    "модельге қабылдаушы серверді жазуға керектің бәрі, ағылшынша",
   Synced: "Синхрондалды",
   "Synced just now": "Жаңа ғана синхрондалды",
   "Synced {n} min ago": "{n} мин бұрын синхрондалды",
@@ -1575,10 +1676,15 @@ const kk: Record<string, string> = {
   "Rebuilds the folder tree so no directory holds more than 256 files":
     "Әр қалтада 256 файлдан аспайтындай етіп қалталар ағашын қайта құрады",
   "Keep the audio for": "Музыканы мыналар үшін қалдыру",
+  Keeping: "Қалдырамыз",
+  Freeing: "Босатамыз",
   "Also delete files that belong to no track": "Ешбір трекке байланысы жоқ файлдарды да өшіру",
   "will be freed": "босайды",
   Staying: "Қалады",
   "Leftover files": "Трексіз файлдар",
+  Other: "Басқа",
+  Free: "Бос",
+  "of this disk": "дискінің",
   "Songs stay in your playlists — only the audio goes, and it downloads again the next time you play it.":
     "Тректер ойнату тізімдерінде қалады — тек файлдар өшеді, келесі тыңдағанда қайта жүктеледі.",
   Clear: "Тазалау",
@@ -1614,13 +1720,6 @@ const kk: Record<string, string> = {
 
 const dicts: Partial<Record<Lang, Record<string, string>>> = { ru, uk, be, kk };
 
-/**
- * Stable per language: a fresh function every render made every effect that
- * depends on it re-run, and the ones that subscribe to backend events tore
- * down and re-registered their listener each time. Tauri keeps those in an
- * array per event name, and a V8 backing store never shrinks when slots are
- * freed - so an afternoon of playback grew it to megabytes.
- */
 export function useT() {
   const { lang } = useLangStore();
   return useCallback((key: string): string => dicts[lang]?.[key] ?? key, [lang]);

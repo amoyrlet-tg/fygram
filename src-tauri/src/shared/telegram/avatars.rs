@@ -1,5 +1,3 @@
-//! Profile pictures, cached next to the app rather than fetched again for every render.
-
 use std::path::Path;
 
 use anyhow::Result;
@@ -17,6 +15,8 @@ pub(crate) struct CurrentUser {
     pub(crate) username: Option<String>,
     pub(crate) avatar_path: Option<String>,
     pub(crate) emoji_status: Option<super::emoji_status::EmojiStatus>,
+    pub(crate) profile_colour: Option<super::profile_colour::ProfileColour>,
+    pub(crate) premium: bool,
 }
 
 impl TelegramState {
@@ -34,6 +34,9 @@ impl TelegramState {
             }
         }
 
+        let profile_colour = super::profile_colour::of_user(&client, avatar_dir, &me.raw).await;
+        let premium = matches!(&me.raw, tl::enums::User::User(user) if user.premium);
+
         Ok(CurrentUser {
             id: user_id,
             first_name: me.first_name().unwrap_or_default().to_string(),
@@ -41,6 +44,8 @@ impl TelegramState {
             username: me.username().map(str::to_string),
             avatar_path,
             emoji_status,
+            profile_colour,
+            premium,
         })
     }
 
@@ -91,7 +96,37 @@ impl grammers_client::media::Downloadable for PhotoVideoLocation {
     }
 }
 
-async fn cleanup_avatar_files(dir: &Path, prefix: &str, legacy: Option<&str>, keep: Option<&str>) {
+async fn ensure_gif(video: &Path, gif: &Path) {
+    if tokio::fs::metadata(gif).await.is_ok() {
+        return;
+    }
+    let (video, gif_path) = (video.to_path_buf(), gif.to_path_buf());
+    let converted = tokio::task::spawn_blocking(move || {
+        crate::shared::animation::video_to_gif(&video, &gif_path)
+    })
+    .await;
+    match converted {
+        Ok(Ok(())) => {}
+        Ok(Err(err)) => {
+            crate::log!("avatar: could not turn the video into a gif: {err:#}");
+            let _ = tokio::fs::remove_file(gif).await;
+        }
+        Err(err) => crate::log!("avatar: gif conversion panicked: {err}"),
+    }
+}
+
+async fn shown_avatar(file: &Path, gif: &Path, still: &Path, animated: bool) -> String {
+    if animated {
+        for candidate in [gif, still] {
+            if tokio::fs::metadata(candidate).await.is_ok() {
+                return candidate.to_string_lossy().to_string();
+            }
+        }
+    }
+    file.to_string_lossy().to_string()
+}
+
+async fn cleanup_avatar_files(dir: &Path, prefix: &str, legacy: Option<&str>, keep: &[String]) {
     let Ok(mut entries) = tokio::fs::read_dir(dir).await else {
         return;
     };
@@ -99,7 +134,7 @@ async fn cleanup_avatar_files(dir: &Path, prefix: &str, legacy: Option<&str>, ke
         let name = entry.file_name();
         let name = name.to_string_lossy().to_string();
         let matches = name.starts_with(prefix) || Some(name.as_str()) == legacy;
-        if matches && Some(name.as_str()) != keep {
+        if matches && !keep.iter().any(|k| k == &name) {
             let _ = tokio::fs::remove_file(entry.path()).await;
         }
     }
@@ -181,14 +216,14 @@ async fn refresh_avatar(
     photo: Option<tl::enums::Photo>,
 ) -> Option<String> {
     let Some(photo_enum) = photo else {
-        cleanup_avatar_files(dir, prefix, legacy, None).await;
+        cleanup_avatar_files(dir, prefix, legacy, &[]).await;
         return None;
     };
 
     let raw = match &photo_enum {
         tl::enums::Photo::Photo(raw) => raw.clone(),
         tl::enums::Photo::Empty(_) => {
-            cleanup_avatar_files(dir, prefix, legacy, None).await;
+            cleanup_avatar_files(dir, prefix, legacy, &[]).await;
             return None;
         }
     };
@@ -204,12 +239,30 @@ async fn refresh_avatar(
             .cloned()
     });
 
-    let ext = if video.is_some() { "mp4" } else { "jpg" };
+    let animated = video.is_some();
+    let ext = if animated { "mp4" } else { "jpg" };
     let file_name = format!("{prefix}{}.{ext}", raw.id);
     let dest = dir.join(&file_name);
+
+    let still_name = format!("{prefix}{}.jpg", raw.id);
+    let still = dir.join(&still_name);
+    let gif_name = format!("{prefix}{}.gif", raw.id);
+    let gif = dir.join(&gif_name);
+    let keep: Vec<String> = if animated {
+        vec![file_name.clone(), still_name.clone(), gif_name.clone()]
+    } else {
+        vec![file_name.clone()]
+    };
+
     if tokio::fs::metadata(&dest).await.is_ok() {
-        cleanup_avatar_files(dir, prefix, legacy, Some(&file_name)).await;
-        return Some(dest.to_string_lossy().to_string());
+        if animated {
+            if tokio::fs::metadata(&still).await.is_err() {
+                let _ = client.download_media(&photo, &still).await;
+            }
+            ensure_gif(&dest, &gif).await;
+        }
+        cleanup_avatar_files(dir, prefix, legacy, &keep).await;
+        return Some(shown_avatar(&dest, &gif, &still, animated).await);
     }
 
     tokio::fs::create_dir_all(dir).await.ok()?;
@@ -239,6 +292,14 @@ async fn refresh_avatar(
         return cached_avatar_fallback(dir, prefix, legacy).await;
     }
 
-    cleanup_avatar_files(dir, prefix, legacy, Some(&file_name)).await;
-    Some(dest.to_string_lossy().to_string())
+    if animated {
+        let _ = client
+            .download_media(&photo, &still)
+            .await
+            .inspect_err(|err| crate::log!("avatar: still frame download failed: {err:#}"));
+        ensure_gif(&dest, &gif).await;
+    }
+
+    cleanup_avatar_files(dir, prefix, legacy, &keep).await;
+    Some(shown_avatar(&dest, &gif, &still, animated).await)
 }

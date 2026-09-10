@@ -1,5 +1,3 @@
-//! The Telegram client, and the only place `grammers` types are allowed.
-
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -17,6 +15,8 @@ mod emoji_status;
 mod errors;
 mod messages;
 mod peers;
+mod profile_colour;
+mod profile_watch;
 mod saved;
 
 pub(crate) use auth::LoginOutcome;
@@ -24,6 +24,7 @@ pub(crate) use avatars::CurrentUser;
 pub(crate) use errors::{is_dead_session, is_edit_forbidden, is_peer_gone};
 pub(crate) use messages::{MessageMeta, TrackUpload};
 pub(crate) use peers::{resolve_channel_peer_for, ChannelInfo};
+pub(crate) use profile_watch::watch_profile;
 
 #[derive(Default)]
 pub(crate) struct TelegramState {
@@ -42,11 +43,19 @@ struct Inner {
 
     runner: Option<tokio::task::JoinHandle<()>>,
     session: Option<Arc<crate::features::auth::session_store::FileSession>>,
+
+    updates: Option<tokio::sync::mpsc::UnboundedReceiver<grammers_session::updates::UpdatesLike>>,
 }
 
 impl TelegramState {
     pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    pub(crate) async fn take_updates(
+        &self,
+    ) -> Option<tokio::sync::mpsc::UnboundedReceiver<grammers_session::updates::UpdatesLike>> {
+        self.inner.lock().await.updates.take()
     }
 
     pub(crate) async fn client(&self) -> Result<Client> {

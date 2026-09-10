@@ -11,7 +11,7 @@ import { onReloginRequested, rememberSessionInvalid } from "@/features/auth/sess
 import { WelcomeScreen } from "@/features/welcome/WelcomeScreen";
 import { LanguagePicker } from "@/features/welcome/LanguagePicker";
 import { useT } from "@/shared/i18n";
-import { useIsDesktopHost } from "@/platforms/host";
+import { WindowChrome } from "@/app/components/WindowChrome";
 import { ToastHost } from "@/shared/ui/Toast";
 import { Library } from "./Library";
 
@@ -21,11 +21,6 @@ const LIBRARY_PRELOAD_DELAY_MS = 700;
 
 function App() {
   const t = useT();
-  // on the document rather than passed around: it is a property of the page
-  const isDesktop = useIsDesktopHost();
-  useEffect(() => {
-    document.documentElement.toggleAttribute("data-compact", !isDesktop);
-  }, [isDesktop]);
   const [screen, setScreen] = useState<Screen>("loading");
   const [libraryMounted, setLibraryMounted] = useState(false);
   const [greetingClosing, setGreetingClosing] = useState(false);
@@ -127,6 +122,7 @@ function App() {
 
   return (
     <>
+      <WindowChrome />
       <ToastHost />
       {content}
       {reloginOpen && (

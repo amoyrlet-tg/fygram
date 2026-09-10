@@ -1,5 +1,3 @@
-//! The IPC surface of ducking: whether it is on.
-
 use tauri::{Manager, State};
 
 use crate::shared::settings;

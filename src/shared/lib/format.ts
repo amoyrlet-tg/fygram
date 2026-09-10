@@ -26,3 +26,39 @@ export function trackLabel(track: Track): { title: string; artist: string } {
     artist: track.artist?.trim() || "Unknown artist",
   };
 }
+
+export function formatDateShort(value: string | null | undefined, locale: string): string {
+  if (!value) return "";
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return "";
+  const date = new Date(ms);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    year: sameYear ? undefined : "numeric",
+  }).format(date);
+}
+
+export type SizeParts = { value: number; unit: "MB" | "GB" | "TB" };
+
+const STEP = 1024;
+
+function roundTo(value: number, unit: SizeParts["unit"]): number {
+  return unit === "MB" ? Math.round(value) : Math.round(value * 10) / 10;
+}
+
+export function sizeParts(bytes: number): SizeParts {
+  let value = Math.max(bytes, 0) / (STEP * STEP);
+  for (const unit of ["MB", "GB"] as const) {
+    const rounded = roundTo(value, unit);
+    if (rounded < STEP) return { value: rounded, unit };
+    value /= STEP;
+  }
+  return { value: roundTo(value, "TB"), unit: "TB" };
+}
+
+export function formatSize(bytes: number, t: (key: string) => string): string {
+  const { value, unit } = sizeParts(bytes);
+  return `${value} ${t(unit)}`;
+}

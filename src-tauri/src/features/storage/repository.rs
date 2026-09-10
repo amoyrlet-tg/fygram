@@ -1,5 +1,3 @@
-//! The file paths the database holds, and repointing them after a move.
-
 use sqlx::SqlitePool;
 
 use crate::shared::error::AppError;

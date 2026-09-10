@@ -1,5 +1,3 @@
-//! Reconciling the local channel list against the one in the cloud.
-
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 

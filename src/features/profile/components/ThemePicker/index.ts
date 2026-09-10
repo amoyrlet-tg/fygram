@@ -1,1 +1,1 @@
-export { ThemePicker } from "./ThemePicker";
+export { ThemeCards, AccentSwatches } from "./ThemePicker";

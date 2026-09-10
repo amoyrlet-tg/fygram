@@ -1,5 +1,3 @@
-//! The IPC surface of channels: adding, syncing, downloading and removing one.
-
 use tauri::{AppHandle, State};
 
 use crate::features::library::ingest::{SyncDepth, SyncStats};
@@ -43,8 +41,6 @@ pub(crate) async fn sync_channel(
     .await
 }
 
-/// Asks Telegram whether editing is still allowed here. One call, no cooldown -
-/// a full sync answers the same question the slow way.
 #[tauri::command]
 pub(crate) async fn refresh_channel_rights(
     state: State<'_, AppState>,
@@ -80,6 +76,36 @@ pub(crate) async fn download_channel(
 ) -> Result<media::download::DownloadStats, String> {
     Box::pin(async move {
         service::download(state, app, channel_id)
+            .await
+            .map_err(String::from)
+    })
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn rename_channel(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    channel_id: String,
+    title: String,
+) -> Result<(), String> {
+    Box::pin(async move {
+        service::rename(state, app, channel_id, title)
+            .await
+            .map_err(String::from)
+    })
+    .await
+}
+
+#[tauri::command]
+pub(crate) async fn set_channel_photo(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    channel_id: String,
+    path: String,
+) -> Result<(), String> {
+    Box::pin(async move {
+        service::set_photo(state, app, channel_id, path)
             .await
             .map_err(String::from)
     })

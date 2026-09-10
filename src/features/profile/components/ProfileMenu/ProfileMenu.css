@@ -1,150 +1,385 @@
-.profile-menu {
-  overflow-y: auto;
-  animation: profile-menu-in 0.22s var(--ease-decelerate) both;
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: var(--scrim);
+
+  backdrop-filter: blur(var(--scrim-blur));
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
 }
-.profile-menu.is-closing {
-  animation: profile-menu-out 0.16s var(--ease-productive) both;
+.settings-backdrop.is-entering {
+  animation: settings-backdrop-in 0.2s var(--ease-productive) both;
 }
-@keyframes profile-menu-in {
+.settings-backdrop.is-closing {
+  animation: settings-backdrop-out 0.16s var(--ease-productive) both;
+}
+@keyframes settings-backdrop-in {
   from {
     opacity: 0;
-    transform: scale(0.94) translateY(-6px);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
   }
 }
-@keyframes profile-menu-out {
+@keyframes settings-backdrop-out {
   from {
     opacity: 1;
-    transform: scale(1) translateY(0);
   }
   to {
     opacity: 0;
-    transform: scale(0.96) translateY(-4px);
   }
 }
 
-.profile-menu.profile-menu-full {
-  width: auto;
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  animation: profile-menu-curtain-in 0.3s var(--ease-decelerate) both;
-}
-.profile-menu.profile-menu-full.is-closing {
-  animation: profile-menu-curtain-out 0.2s var(--ease-productive) both;
-}
-@keyframes profile-menu-curtain-in {
-  from {
-    clip-path: inset(0 0 100% 0);
-  }
-  to {
-    clip-path: inset(0 0 0% 0);
-  }
-}
-@keyframes profile-menu-curtain-out {
-  from {
-    clip-path: inset(0 0 0% 0);
-  }
-  to {
-    clip-path: inset(0 0 100% 0);
-  }
-}
-.profile-menu.profile-menu-full .profile-menu-columns {
+.settings-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  z-index: 121;
+  width: min(420px, calc(100vw - 32px));
+  height: fit-content;
+  max-height: calc(100vh - 64px);
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  background: var(--bg-elevated);
+  border-radius: 14px;
+  overflow: hidden;
+  will-change: transform, opacity;
 }
-.profile-menu.profile-menu-full .profile-menu-col-divider {
-  display: none;
+/*
+ * Only while entering. Left on the element for good, the rule replays the whole
+ * animation whenever anything else changes what animations are allowed - switching eco
+ * mode off did exactly that, and the open dialog blinked shut and open again.
+ */
+.settings-dialog.is-entering {
+  animation: settings-in 0.2s var(--ease-out) both;
 }
-
-.profile-menu-backdrop {
-  /* Only the wash fades. Animating `backdrop-filter` recomposites the whole
-     screen on every frame, and the stutter is what made it look cheap. */
-  animation: profile-backdrop-in 0.22s var(--ease-productive) both;
+.settings-dialog.is-closing {
+  animation: settings-out 0.14s var(--ease-productive) both;
 }
-.profile-menu-backdrop.is-closing {
-  animation: profile-backdrop-out 0.18s var(--ease-productive) both;
-}
-@keyframes profile-backdrop-in {
+@keyframes settings-in {
   from {
     opacity: 0;
+    transform: scale(0.97);
   }
   to {
     opacity: 1;
+    transform: scale(1);
   }
 }
-@keyframes profile-backdrop-out {
+@keyframes settings-out {
   from {
     opacity: 1;
+    transform: scale(1);
   }
   to {
     opacity: 0;
+    transform: scale(0.98);
   }
 }
 
-.profile-session-alert {
+.settings-head {
   display: flex;
   align-items: center;
-  gap: var(--spacing-tighter);
-  margin-bottom: var(--spacing-tighter);
-  padding: var(--spacing-tighter-2) var(--spacing-tighter);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  flex: 0 0 auto;
+
+  background: color-mix(in srgb, #000 14%, var(--bg-elevated));
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  margin-right: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.settings-back:hover {
+  background: var(--bg-hover);
+}
+
+.settings-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.settings-close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.settings-title {
+  flex: 0 1 auto;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/*
+ * The two pages ride one track under the header, so moving between them is the track
+ * sliding rather than the dialog being rebuilt around new content. The viewport clips
+ * whichever page is off to the side, and follows the height of the one that is not -
+ * see goTo in ProfileMenu.tsx, which pins that height for the length of the slide.
+ */
+.settings-pages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  transition: height 260ms var(--ease-out);
+}
+
+.settings-track {
+  display: flex;
+  height: 100%;
+}
+/* Only while it moves: left on, the rule would replay every time styles change. */
+.settings-track.is-sliding {
+  transition: transform 260ms var(--ease-out);
+  will-change: transform;
+}
+.settings-track.is-second {
+  transform: translateX(-100%);
+}
+/*
+ * The slide says which way the pages lie, so it survives eco mode where the button
+ * flourishes do not - the same reason the profile marquee keeps running. It costs one
+ * transform on one element, for a quarter of a second, and only when the page changes.
+ * The height goes with it: left behind, it would snap to the next page's size on the
+ * first frame while the pages were still moving, which is the jolt the slide is for.
+ */
+:root[data-eco] .settings-track.is-sliding {
+  transition: transform 260ms var(--ease-out) !important;
+}
+:root[data-eco] .settings-pages {
+  transition: height 260ms var(--ease-out) !important;
+}
+
+.settings-pane {
+  flex: 0 0 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px 12px;
+  overflow-y: auto;
+}
+
+.settings-list {
+  --settings-radius: 18px;
+  --settings-radius-inner: 6px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settings-group > * {
+  border-radius: var(--settings-radius-inner);
+}
+.settings-group > :first-child {
+  border-top-left-radius: var(--settings-radius);
+  border-top-right-radius: var(--settings-radius);
+}
+.settings-group > :last-child {
+  border-bottom-left-radius: var(--settings-radius);
+  border-bottom-right-radius: var(--settings-radius);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 11px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 22px 8px 17px;
+  border: none;
+  background: var(--bg-elevated-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.settings-row.is-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 22px 14px 17px;
+}
+
+.settings-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+
+  gap: 0;
+  min-width: 0;
+
+  padding-right: 4px;
+}
+.settings-row-title {
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.settings-row-note {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-faint);
+}
+
+label.settings-row {
+  cursor: pointer;
+}
+label.settings-row:hover,
+.settings-link:hover {
+  background: var(--bg-hover);
+}
+.settings-row.is-disabled {
+  cursor: default;
+}
+.settings-row.is-disabled:hover {
+  background: var(--bg-elevated-2);
+}
+.settings-row.is-disabled .settings-row-title {
+  color: var(--text-faint);
+}
+
+.settings-link {
+  cursor: pointer;
+}
+/*
+ * A child of the row above it. The empty icon slot already lines its title up with the
+ * parent's, so all it needs is a tick in that slot to say where it belongs.
+ */
+.settings-row.is-nested {
+  min-height: 46px;
+}
+.settings-row.is-nested .settings-row-title {
+  color: var(--text-dim);
+}
+.settings-row.is-nested .settings-row-icon {
+  color: var(--text-faint);
+}
+
+.settings-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+
+  width: 40px;
+  height: 40px;
+  color: var(--text-dim);
+}
+.settings-link:hover .settings-row-icon {
+  color: var(--text);
+}
+.settings-row-chevron {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+.settings-link.is-danger .settings-row-title {
+  color: var(--danger);
+}
+.settings-link.is-danger .settings-row-icon {
+  color: var(--danger);
+}
+.settings-link.is-danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.settings-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
   border: 1px solid color-mix(in srgb, var(--accent-yellow) 45%, transparent);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
 }
-
-.profile-session-alert-text {
+.settings-alert-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
-
-.profile-session-alert-text strong {
+.settings-alert-text strong {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text);
 }
-
-.profile-session-alert-text span {
+.settings-alert-text span {
   font-size: 12px;
   line-height: 1.35;
   color: var(--text-faint);
 }
-
-.profile-session-alert-btn {
+.settings-alert-btn {
   flex: 0 0 auto;
   white-space: nowrap;
 }
 
-@media (max-width: 720px) {
-  .profile-session-alert {
-    flex-direction: column;
-    align-items: stretch;
-  }
+.settings-appearance,
+.settings-language {
+  background: transparent;
+}
+.settings-appearance:hover,
+.settings-language:hover {
+  background: transparent;
+}
+.settings-appearance {
+  gap: 14px;
+  padding: 4px 4px 14px;
+}
+.settings-heading {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--accent-base, var(--blue));
 }
 
-.profile-chip.has-alert {
-  position: relative;
+.settings-language {
+  justify-content: space-between;
+  padding: 8px 4px;
+  min-height: 44px;
 }
 
-.profile-chip.has-alert::after {
+.settings-group + .settings-group::before {
   content: "";
-  position: absolute;
-  top: 1px;
-  right: 1px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-yellow);
-  box-shadow: 0 0 0 2px var(--bg-elevated);
-}
-
-.profile-name-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
+  display: block;
+  height: 10px;
+  margin: 0 -10px 14px;
+  background: var(--divider);
 }

@@ -1,18 +1,14 @@
 .auth-screen {
   position: relative;
-  /* the window as it actually is, not as it was before a keyboard opened - see
-     --app-height in base.css */
-  height: var(--app-height);
+
+  height: 100vh;
   display: flex;
-  /* top-aligned plus auto margins on the body: centred while it fits, and still
-     scrollable to the very top when it does not - plain centring would clip the
-     head of an overflowing card with no way to reach it */
+
   align-items: flex-start;
   justify-content: center;
   background: var(--bg);
-  /* the top bar is absolutely positioned at the top edge, and the window draws
-     under the status bar, so both the bar and this padding have to step over it */
-  padding: calc(56px + var(--safe-top)) 20px max(24px, var(--safe-bottom));
+
+  padding: 56px 20px 24px;
   overflow-y: auto;
 
   text-transform: lowercase;
@@ -29,7 +25,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(16px + var(--safe-top)) 20px 16px;
+  padding: 16px 20px;
 }
 .auth-brand {
   display: flex;
@@ -46,10 +42,8 @@
   width: 400px;
   max-width: 100%;
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 30px 32px 20px;
-  box-shadow: var(--shadow-lg);
   text-align: center;
 }
 .auth-title {
@@ -81,15 +75,10 @@
 }
 .auth-card .btn-primary:hover:not(:disabled) {
   background: var(--blue-hover);
-  transform: scale(1.02);
 }
 .auth-card .field input {
   padding: 12px 14px;
 }
-.auth-card .field input:focus {
-  border-color: var(--blue);
-}
-
 .auth-error {
   background: rgba(255, 107, 107, 0.12);
   color: var(--danger);
@@ -124,8 +113,6 @@
   max-width: 100%;
 }
 
-/* language and theme sit under the card in plain sight, with their names on
-   them - in the corner as bare icons nobody found them */
 .auth-prefs {
   display: flex;
   align-items: center;
@@ -138,7 +125,7 @@
   align-items: center;
   gap: 7px;
   padding: 7px 12px;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-pill);
   background: var(--bg-elevated);
   color: var(--text-dim);
@@ -146,30 +133,18 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition:
-    color var(--duration-shortest) var(--ease-out),
-    border-color var(--duration-shortest) var(--ease-out);
 }
 .auth-pref-btn:hover {
   color: var(--text);
-  border-color: var(--border-strong);
+  background: var(--bg-hover);
 }
 
-/* the switcher sits at the bottom of the screen, so its menu opens upward -
-   downward it pushed the whole page into a scroll */
-.auth-prefs .lang-dropdown {
-  top: auto;
-  bottom: calc(100% + 6px);
-}
-
-/* phones and the app's own narrow window: the card ate the whole viewport and
-   the brand sat on top of it, while language and theme fell below the fold */
 @media (max-width: 480px) {
   .auth-screen {
-    padding: calc(54px + var(--safe-top)) 12px max(20px, var(--safe-bottom));
+    padding: 54px 12px 20px;
   }
   .auth-topbar {
-    padding: calc(12px + var(--safe-top)) 14px 12px;
+    padding: 12px 14px;
   }
   .auth-card {
     padding: 24px 18px 22px;
@@ -185,4 +160,14 @@
   .auth-body {
     gap: 12px;
   }
+}
+
+.brand-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 14.5px;
+  letter-spacing: -0.01em;
 }

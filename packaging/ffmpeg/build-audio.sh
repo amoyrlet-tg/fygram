@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Builds the ffmpeg fygram links against: audio only.
+# Builds the ffmpeg fygram links against: the audio decoders, plus H.264.
 #
 # Telegram desktop decodes every file through ffmpeg rather than picking a
 # decoder per format, and fygram now does the same - it is the only way a music
@@ -17,10 +17,6 @@
 # single invocation with one FFMPEG_DIR - so pass "universal" to build for arm64
 # and x86_64 and lipo the archives together into a single prefix that satisfies
 # both.
-#
-# Android is one prefix per ABI - "android-x86_64" for an emulator or Waydroid
-# on a normal machine, "android-arm64" for a phone - and needs ANDROID_NDK_HOME
-# pointing at the ndk.
 set -euo pipefail
 
 VERSION="7.1.1"
@@ -87,46 +83,18 @@ case "$ARCH" in
   msvc-x86)
     CROSS_FLAGS=(--toolchain=msvc --arch=x86 --cpu=i686)
     ;;
-  android-x86_64|android-arm64)
-    # Android builds go through the NDK's own clang. The API level has to match
-    # the minSdk in gen/android/app/build.gradle.kts, or the linker will happily
-    # bind symbols the device does not have.
-    NDK="${ANDROID_NDK_HOME:-${NDK_HOME:-}}"
-    [ -n "$NDK" ] || { echo "set ANDROID_NDK_HOME to the ndk directory" >&2; exit 1; }
-    TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64"
-    [ -d "$TOOLCHAIN" ] || { echo "no toolchain at $TOOLCHAIN" >&2; exit 1; }
-    API=26
-    if [ "$ARCH" = "android-x86_64" ]; then
-      TRIPLE=x86_64-linux-android
-      FF_ARCH=x86_64
-    else
-      TRIPLE=aarch64-linux-android
-      FF_ARCH=aarch64
-      # the hand-written x86 assembly means nothing here
-      ASM_FLAG="--disable-x86asm"
-    fi
-    CROSS_FLAGS=(--enable-cross-compile --target-os=android --arch="$FF_ARCH"
-                 --sysroot="$TOOLCHAIN/sysroot"
-                 --cc="$TOOLCHAIN/bin/${TRIPLE}${API}-clang"
-                 --cxx="$TOOLCHAIN/bin/${TRIPLE}${API}-clang++"
-                 --ar="$TOOLCHAIN/bin/llvm-ar"
-                 --nm="$TOOLCHAIN/bin/llvm-nm"
-                 --ranlib="$TOOLCHAIN/bin/llvm-ranlib"
-                 --strip="$TOOLCHAIN/bin/llvm-strip"
-                 --cross-prefix="$TOOLCHAIN/bin/llvm-")
-    ;;
 esac
 
 ./configure \
   --prefix="$PREFIX" \
   --enable-static --disable-shared --enable-pic \
   --disable-everything --disable-programs --disable-doc --disable-autodetect \
-  --disable-avdevice --disable-swscale --disable-postproc --disable-avfilter \
+  --disable-avdevice --disable-postproc --disable-avfilter \
   --disable-network --disable-iconv --disable-xlib --disable-sdl2 \
   --disable-vaapi --disable-vdpau --disable-videotoolbox --disable-audiotoolbox \
-  --enable-decoder=mp3,mp3float,aac,aac_fixed,aac_latm,alac,flac,vorbis,opus,wavpack,wmav1,wmav2,ape,mpc7,mpc8,tta,shorten,als,atrac3,atrac3p,cook,eac3,ac3,dts,mp1,mp1float,mp2,mp2float,amrnb,amrwb,gsm,gsm_ms,adpcm_ima_wav,adpcm_ms,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_f32le,pcm_f64le,pcm_u8,pcm_alaw,pcm_mulaw \
+  --enable-decoder=h264,mp3,mp3float,aac,aac_fixed,aac_latm,alac,flac,vorbis,opus,wavpack,wmav1,wmav2,ape,mpc7,mpc8,tta,shorten,als,atrac3,atrac3p,cook,eac3,ac3,dts,mp1,mp1float,mp2,mp2float,amrnb,amrwb,gsm,gsm_ms,adpcm_ima_wav,adpcm_ms,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_f32le,pcm_f64le,pcm_u8,pcm_alaw,pcm_mulaw \
   --enable-demuxer=mp3,mov,ogg,flac,wav,aac,matroska,ape,asf,wv,aiff,au,caf,dsf,mpc,mpc8,tta,ac3,eac3,dts,amr,w64,rm,tak,voc,gsm,pcm_s16le,pcm_s16be,pcm_u8,pcm_f32le,pcm_alaw,pcm_mulaw \
-  --enable-parser=mpegaudio,aac,aac_latm,flac,vorbis,opus,ac3,dca,tak,cook \
+  --enable-parser=h264,hevc,mpegaudio,aac,aac_latm,flac,vorbis,opus,ac3,dca,tak,cook \
   --enable-protocol=file \
   $ASM_FLAG "${CROSS_FLAGS[@]}"
 

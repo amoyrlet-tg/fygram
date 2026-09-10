@@ -16,8 +16,6 @@ const TOAST_KEY = "channel-rights";
 
 const NOTICE_MS = 7000;
 
-/** A refusal has to say how to get the right back, or the edit button simply
- *  stops working one day with no reason given. */
 export function useChannelRightsNotice() {
   const t = useT();
 
@@ -41,14 +39,11 @@ export function useChannelRightsNotice() {
   }, [t]);
 }
 
-/** A stored no is re-checked on the spot: being made an admin five minutes ago
- *  is the usual reason for clicking a locked pencil. */
 export function useEnsureEditable() {
   const t = useT();
 
   return useCallback(
     async (channel: Channel | undefined): Promise<boolean> => {
-      // unknown is not a refusal: the backend checks before it spends anything
       if (!channel || channel.can_edit !== false) return true;
 
       const named = (key: string) => t(key).replace("{channel}", channel.title);

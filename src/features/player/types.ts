@@ -20,20 +20,10 @@ export interface PlayerState {
 }
 
 export const POLL_MS = 500;
-/**
- * How often the backend is actually asked where playback is. The progress bar
- * ticks on `POLL_MS` off the local clock; between seeks the position is simply
- * elapsed time, and asking Rust for it twice a second bought nothing.
- */
 export const POSITION_SYNC_MS = 5_000;
-/** Inside this much of the end, go back to asking every tick: the handover to
- * the next track has to happen on time, and only the backend knows it drained. */
 export const NEAR_END_S = 10;
-/** Download progress arrives every 120ms per track. Redrawing the library that
- * often is what made downloading cost more memory than playing. */
 export const PROGRESS_THROTTLE_MS = 250;
 export const PROFILE_SYNC_MS = 15_000;
-export const BROADCAST_MS = 3_000;
 export const END_EPSILON = 0.75;
 export const MIN_PLAY_MS = 1500;
 export const SHUFFLE_NO_REPEAT = 10;

@@ -1,5 +1,3 @@
-//! Turning a channel id into something the protocol will accept, and remembering the answer.
-
 use anyhow::{anyhow, Result};
 use grammers_client::peer::Peer;
 use grammers_client::tl;
@@ -22,18 +20,13 @@ pub(crate) struct ChannelInfo {
 
     pub(crate) access_hash: i64,
 
-    /// None when this was rebuilt from our own row and nobody has asked yet.
     pub(crate) can_edit: Option<bool>,
 
-    /// Separate from `can_edit`: Telegram grants the two independently, and a
-    /// forwarded track can only be fixed by this one.
     pub(crate) can_repost: Option<bool>,
+
+    pub(crate) broadcast: Option<bool>,
 }
 
-/// What this account may do to the messages of one channel.
-///
-/// Deliberately conservative: a wrong no costs a resync, a wrong yes costs a
-/// download, a tag write and an upload before Telegram refuses anyway.
 #[derive(Debug, Clone, Copy)]
 struct Rights {
     edit: bool,
@@ -59,7 +52,6 @@ impl Rights {
         match admin {
             Some(tl::enums::ChatAdminRights::Rights(rights)) => Self {
                 edit: rights.edit_messages,
-                // a delete and a post, granted separately from editing
                 repost: rights.delete_messages && rights.post_messages,
             },
             None => Self::NONE,
@@ -76,11 +68,19 @@ fn info_from_channel(raw: &tl::types::Channel) -> ChannelInfo {
         access_hash: raw.access_hash.unwrap_or(0),
         can_edit: Some(rights.edit),
         can_repost: Some(rights.repost),
+        broadcast: Some(raw.broadcast),
     }
 }
 
 fn channel_rights_of(raw: &tl::types::Channel) -> Rights {
     Rights::of(raw.creator, raw.left, raw.admin_rights.as_ref())
+}
+
+fn is_broadcast(raw: &tl::enums::Chat) -> bool {
+    match raw {
+        tl::enums::Chat::Channel(channel) => channel.broadcast,
+        _ => false,
+    }
 }
 
 fn group_rights_of(raw: &tl::enums::Chat) -> Rights {
@@ -89,7 +89,6 @@ fn group_rights_of(raw: &tl::enums::Chat) -> Rights {
         tl::enums::Chat::Chat(chat) => {
             Rights::of(chat.creator, chat.left, chat.admin_rights.as_ref())
         }
-        // an empty or forbidden chat is one we cannot even read
         _ => Rights::NONE,
     }
 }
@@ -121,6 +120,7 @@ impl TelegramState {
                     access_hash: 0,
                     can_edit: Some(rights.edit),
                     can_repost: Some(rights.repost),
+                    broadcast: Some(is_broadcast(&group.raw)),
                 })
             }
             Peer::User(_) => Err(anyhow!(
@@ -147,6 +147,7 @@ impl TelegramState {
                         access_hash: 0,
                         can_edit: Some(rights.edit),
                         can_repost: Some(rights.repost),
+                        broadcast: Some(is_broadcast(&group.raw)),
                     });
                 }
                 _ => {}
@@ -157,8 +158,6 @@ impl TelegramState {
         ))
     }
 
-    /// The "minimal resync": one `channels.getChannels` when the access hash is
-    /// stored. Only a channel never resolved falls back to the dialog scan.
     pub(crate) async fn channel_rights(
         &self,
         channel_id: i64,
@@ -168,15 +167,12 @@ impl TelegramState {
         if access_hash != 0 {
             match self.channel_rights_direct(channel_id, access_hash).await {
                 Ok(info) => return Ok(info),
-                // a rotated hash, or we were thrown out; the slower paths may
-                // still know
                 Err(err) => crate::log!("telegram: direct rights lookup for {channel_id}: {err}"),
             }
         }
 
         if let Some(username) = username {
             let info = self.resolve_channel_by_username(username).await?;
-            // a username can move to another channel; the id is what we asked about
             if info.id == channel_id {
                 return Ok(info);
             }
@@ -214,6 +210,52 @@ impl TelegramState {
                 _ => None,
             })
             .ok_or_else(|| anyhow!("telegram returned no channel {channel_id}"))
+    }
+
+    pub(crate) async fn rename_channel(
+        &self,
+        channel_id: i64,
+        access_hash: i64,
+        title: &str,
+    ) -> Result<()> {
+        let client = self.client().await?;
+        client
+            .invoke(&tl::functions::channels::EditTitle {
+                channel: tl::enums::InputChannel::Channel(tl::types::InputChannel {
+                    channel_id,
+                    access_hash,
+                }),
+                title: title.to_string(),
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub(crate) async fn set_channel_photo(
+        &self,
+        channel_id: i64,
+        access_hash: i64,
+        path: &std::path::Path,
+    ) -> Result<()> {
+        let client = self.client().await?;
+        let uploaded = client.upload_file(path).await?;
+        client
+            .invoke(&tl::functions::channels::EditPhoto {
+                channel: tl::enums::InputChannel::Channel(tl::types::InputChannel {
+                    channel_id,
+                    access_hash,
+                }),
+                photo: tl::enums::InputChatPhoto::InputChatUploadedPhoto(
+                    tl::types::InputChatUploadedPhoto {
+                        file: Some(uploaded.raw),
+                        video: None,
+                        video_start_ts: None,
+                        video_emoji_markup: None,
+                    },
+                ),
+            })
+            .await?;
+        Ok(())
     }
 
     pub(crate) async fn resolve_channel_peer(

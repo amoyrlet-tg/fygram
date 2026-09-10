@@ -1,5 +1,3 @@
-//! The IPC surface of playback: play, pause, seek, volume, position.
-
 use tauri::{AppHandle, State};
 
 use crate::AppState;
@@ -62,4 +60,24 @@ pub(crate) fn seek_playback(state: State<'_, AppState>, seconds: f64) {
 #[tauri::command]
 pub(crate) fn get_playback_position(state: State<'_, AppState>) -> audio::PlaybackState {
     state.player.position()
+}
+
+#[tauri::command]
+pub(crate) async fn list_audio_outputs(
+    state: State<'_, AppState>,
+) -> Result<service::AudioOutputs, String> {
+    Box::pin(async move { service::audio_outputs(state).await.map_err(String::from) }).await
+}
+
+#[tauri::command]
+pub(crate) async fn set_audio_output(
+    state: State<'_, AppState>,
+    device: Option<String>,
+) -> Result<(), String> {
+    Box::pin(async move {
+        service::set_audio_output(state, device)
+            .await
+            .map_err(String::from)
+    })
+    .await
 }

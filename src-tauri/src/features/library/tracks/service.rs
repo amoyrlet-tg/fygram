@@ -1,8 +1,3 @@
-//! What the tracks commands actually do.
-//!
-//! Editing a tag is not a local change: the file on disk is the copy Telegram
-//! holds, so every edit ends as a re-upload of that message.
-
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -21,7 +16,6 @@ use super::permissions::{ensure_may_edit, ensure_may_repost, refusal};
 use super::repository;
 use super::retag;
 
-/// Empty and whitespace-only values mean "clear it".
 pub(super) struct TagEdit {
     pub(crate) title: Option<String>,
     pub(crate) artist: Option<String>,
@@ -67,7 +61,6 @@ pub(super) async fn update_track(
         .await
         .map_err(AppError::Msg)?;
 
-    // the live message decides, not the row: a sync may not have run since
     let meta = state
         .telegram
         .message_meta(peer, track.tg_message_id as i32)
@@ -75,8 +68,6 @@ pub(super) async fn update_track(
         .map_err(|err| AppError::Msg(format!("{err}")))?;
 
     if meta.is_forward() {
-        // the row is corrected and the interface reloads it, so the open
-        // dialog turns into the replace-it one by itself
         repository::mark_forwarded(&state.db, &track_id, &meta).await?;
         let _ = app.emit("library-changed", ());
         return Err(AppError::Msg(
@@ -86,7 +77,6 @@ pub(super) async fn update_track(
         ));
     }
     if track.forwarded == Some(true) {
-        // most likely replaced from another device
         repository::mark_not_forwarded(&state.db, &track_id).await?;
     }
 
@@ -103,7 +93,6 @@ pub(super) async fn update_track(
         .await?;
     }
 
-    // the cover lives inside the file, so it goes in before the upload
     if let Some(cover) = cover_path.as_deref().filter(|p| !p.trim().is_empty()) {
         crate::log!("update_track({track_id}): writing {cover} into the file");
         media::covers::write_cover_into(Path::new(&track.file_path), Path::new(cover))
@@ -114,7 +103,6 @@ pub(super) async fn update_track(
         media::covers::forget_cached_cover(&dir, &track.channel_id, &track.file_hash).await;
     }
 
-    // an edit without a thumbnail strips the artwork the message already had
     let thumbnail = media::covers::telegram_thumbnail(Path::new(&track.file_path)).await;
 
     crate::log!(
@@ -140,7 +128,6 @@ pub(super) async fn update_track(
 
     if let Err(err) = upload {
         crate::log!("update_track({track_id}): telegram refused it: {err}");
-        // a lost right is remembered, a lost connection is not
         return Err(refusal(&state, &app, &track.channel_id, &err).await);
     }
     crate::log!(
@@ -148,7 +135,6 @@ pub(super) async fn update_track(
         started.elapsed().as_secs_f32()
     );
 
-    // Telegram just proved the right exists
     if let Err(err) =
         channels_repository::set_edit_right(&state.db, &track.channel_id, true, None).await
     {
@@ -166,19 +152,12 @@ pub(super) async fn update_track(
     repository::get_one(&state.db, &track_id).await
 }
 
-/// The caption is composed by the interface and shown before it goes up: it
-/// lands in a public channel.
 pub(super) struct Repost {
     pub(crate) tags: TagEdit,
     pub(crate) caption: String,
-    /// Off leaves both messages in the channel, which is what to do when the
-    /// original carries comments worth keeping.
     pub(crate) delete_original: bool,
 }
 
-/// Telegram will not edit a forwarded message at all - the forward header is
-/// part of what the message is - so the only repair is to post it again. That
-/// loses the original's date, which is what the caption carries.
 pub(super) async fn repost_track(
     state: State<'_, AppState>,
     app: AppHandle,
@@ -260,8 +239,6 @@ pub(super) async fn repost_track(
     };
     crate::log!("repost_track({track_id}): the track now lives in message {posted}");
 
-    // other devices point at tracks by (channel, message id), so this one
-    // looks parked to them until `telegram_sync::resolve_pending_tracks` runs
     repository::replace_message(&state.db, &track_id, i64::from(posted)).await?;
     repository::update_tags(&state.db, &track_id, &title, &artist, &album).await?;
 
@@ -274,7 +251,6 @@ pub(super) async fn repost_track(
     repository::get_one(&state.db, &track_id).await
 }
 
-/// None when the file carries no picture.
 pub(super) async fn cover(
     state: State<'_, AppState>,
     app: AppHandle,
@@ -284,7 +260,6 @@ pub(super) async fn cover(
     Ok(media::covers::ensure_cover(&state.db, &media_dir, &track_id).await?)
 }
 
-/// Returns how many rows changed.
 pub(super) async fn retag_tracks(state: State<'_, AppState>) -> Result<u32, AppError> {
     let changed_track_ids = retag::run(&state.db).await?;
     let count = changed_track_ids.len() as u32;
@@ -307,7 +282,6 @@ pub(super) async fn list(state: State<'_, AppState>) -> Result<Vec<Track>, AppEr
     repository::list_ordered(&state.db).await
 }
 
-/// Every word must appear somewhere, so more words narrow the result.
 pub(super) async fn search(
     state: State<'_, AppState>,
     query: String,
@@ -334,7 +308,6 @@ pub(super) async fn search(
         .collect())
 }
 
-/// See `media::covers::cover_paths`.
 pub(super) async fn cover_paths(
     state: State<'_, AppState>,
     app: AppHandle,

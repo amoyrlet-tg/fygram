@@ -1,8 +1,3 @@
-//! The artwork a track carries, and the colours it is made of.
-//!
-//! Telegram keeps the picture inside the file, so changing a cover means
-//! rewriting the file and uploading it again.
-
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -15,13 +10,10 @@ use crate::shared::models::Track;
 #[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct Cover {
     pub(crate) path: String,
+    pub(crate) preview: String,
     pub(crate) palette: Vec<String>,
 }
 
-/// The two or three colours a cover is made of, for painting a page behind it.
-///
-/// Binned rather than averaged: averaging gives the same brown-grey for
-/// everything. The picks are kept apart, or one hue returns three shades.
 fn palette_of(bytes: &[u8]) -> Vec<String> {
     const BUCKETS: u32 = 5;
     const SIDE: u32 = 24;
@@ -42,7 +34,7 @@ fn palette_of(bytes: &[u8]) -> Vec<String> {
         let max = r.max(g).max(b);
         let min = r.min(g).min(b);
         if max < 10 || min > 248 {
-            continue; // only the pure extremes say nothing about a cover
+            continue;
         }
         let saturation = if max == 0 {
             0.0
@@ -96,12 +88,6 @@ fn palette_of(bytes: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// The one colour a picture reads as, for tinting the page behind it.
-///
-/// This used to happen in the webview: the file crossed IPC as a base64 data
-/// URL, became an `Image`, and was drawn to a canvas only to read 48x48 pixels
-/// back out. Per cover that put a megabyte of string plus a full-size decoded
-/// bitmap into the renderer, and the renderer was left holding it.
 pub(crate) fn ambient_colour_of(bytes: &[u8]) -> Option<String> {
     const SIDE: u32 = 48;
 
@@ -125,8 +111,6 @@ fn saturation_of(r: f32, g: f32, b: f32) -> f32 {
     }
 }
 
-/// The heaviest bin of the picture, weighted towards saturated mid-tones: a
-/// plain average gives the same brown-grey for every cover.
 fn dominant_colour(image: &image::RgbaImage) -> Option<(f32, f32, f32)> {
     #[derive(Default)]
     struct Bin {
@@ -145,7 +129,7 @@ fn dominant_colour(image: &image::RgbaImage) -> Option<(f32, f32, f32)> {
         }
         let max = r.max(g).max(b);
         if max < 60 || (r > 240 && g > 240 && b > 240) {
-            continue; // near-black and near-white say nothing about a cover
+            continue;
         }
 
         let key = ((r as u32 >> 4) << 8) | ((g as u32 >> 4) << 4) | (b as u32 >> 4);
@@ -170,8 +154,6 @@ fn dominant_colour(image: &image::RgbaImage) -> Option<(f32, f32, f32)> {
     ))
 }
 
-/// Covers run dark and muddy more often than not, and a tint has to read
-/// against the page, so the pick is pushed towards something worth painting.
 fn boost_vividness(r: f32, g: f32, b: f32) -> [u8; 3] {
     let (rn, gn, bn) = (r / 255.0, g / 255.0, b / 255.0);
     let max = rn.max(gn).max(bn);
@@ -237,8 +219,6 @@ fn hue_to_rgb(p: f32, q: f32, t: f32) -> f32 {
     }
 }
 
-/// Reads tags leniently: channel audio carries malformed metadata - a year that
-/// is not four digits - and lofty's default mode refuses the whole file over it.
 pub(super) fn read_tags(
     path: &Path,
 ) -> std::result::Result<lofty::file::TaggedFile, lofty::error::LoftyError> {
@@ -249,11 +229,8 @@ pub(super) fn read_tags(
         .read()
 }
 
-// never displayed larger, and a 12 MP photograph would ride along in every copy
 const COVER_LONGEST_SIDE: u32 = 1000;
 
-/// Always JPEG, proportions kept. Decoding first refuses a broken file before
-/// anything is written.
 pub(crate) async fn encode_cover(picture: Vec<u8>) -> Result<Vec<u8>> {
     tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {
         let decoded = image::load_from_memory(&picture).context("this file is not an image")?;
@@ -278,8 +255,6 @@ pub(crate) async fn encode_cover(picture: Vec<u8>) -> Result<Vec<u8>> {
     .await?
 }
 
-/// Writes a picture into an audio file's tags. The edit only reaches the
-/// channel once the file goes up again, so this runs before the upload.
 pub(crate) async fn write_cover_into(audio: &Path, image: &Path) -> Result<()> {
     let picture = tokio::fs::read(image)
         .await
@@ -303,9 +278,6 @@ pub(crate) async fn write_cover_into(audio: &Path, image: &Path) -> Result<()> {
             .primary_tag_mut()
             .context("this file cannot hold tags")?;
 
-        // ffmpeg files artwork under "Other" as often as "Cover (front)", and
-        // lofty appends rather than replaces - removing only front covers left
-        // the old picture ahead of the new one
         while !tag.pictures().is_empty() {
             tag.remove_picture(0);
         }
@@ -323,8 +295,6 @@ pub(crate) async fn write_cover_into(audio: &Path, image: &Path) -> Result<()> {
     .await?
 }
 
-/// Any picture counts: ffmpeg marks artwork "Other" as often as "Cover
-/// (front)". The front cover only wins when a file holds several.
 fn embedded_picture(audio: &Path) -> Option<Vec<u8>> {
     let tagged = read_tags(audio).ok()?;
     let tag = tagged.primary_tag().or_else(|| tagged.first_tag())?;
@@ -336,14 +306,9 @@ fn embedded_picture(audio: &Path) -> Option<Vec<u8>> {
         .map(|p| p.data().to_vec())
 }
 
-// Telegram never looks inside a file for artwork: a music message shows a
-// thumbnail uploaded beside the document. Numbers from tdesktop's
-// `PrepareFileThumbnail`, storage/localimageloader.cpp.
 const THUMBNAIL_SIDE: u32 = 320;
 const THUMBNAIL_QUALITY: u8 = 87;
 
-/// None when the file carries no picture, or when Telegram would refuse its
-/// shape - it rejects anything past twenty to one. Nothing is cropped.
 pub(crate) async fn telegram_thumbnail(audio: &Path) -> Option<Vec<u8>> {
     use image::codecs::jpeg::JpegEncoder;
     use image::{ExtendedColorType, ImageEncoder};
@@ -358,7 +323,6 @@ pub(crate) async fn telegram_thumbnail(audio: &Path) -> Option<Vec<u8>> {
             return None;
         }
 
-        // `resize` keeps the ratio, the arithmetic tdesktop spells out by hand
         let scaled = if width.max(height) > THUMBNAIL_SIDE {
             decoded.resize(
                 THUMBNAIL_SIDE,
@@ -386,7 +350,67 @@ pub(crate) async fn telegram_thumbnail(audio: &Path) -> Option<Vec<u8>> {
     .flatten()
 }
 
-/// Drops the extracted copy, so the next request reads the file again.
+const PREVIEW_SIDE: u32 = 256;
+const PREVIEW_QUALITY: u8 = 82;
+
+pub(crate) async fn ensure_preview(media_dir: &Path, channel_id: &str, hash: &str) -> String {
+    let cover = media_paths::cover_path(media_dir, channel_id, hash);
+    let full = cover.to_string_lossy().to_string();
+    let preview = media_paths::cover_preview_path(media_dir, channel_id, hash);
+
+    if tokio::fs::metadata(&preview)
+        .await
+        .is_ok_and(|m| m.len() > 0)
+    {
+        return preview.to_string_lossy().to_string();
+    }
+
+    let Ok(bytes) = tokio::fs::read(&cover).await else {
+        return full;
+    };
+
+    let scaled = tokio::task::spawn_blocking(move || shrink(&bytes))
+        .await
+        .ok()
+        .flatten();
+
+    match scaled {
+        Some(jpeg) if tokio::fs::write(&preview, &jpeg).await.is_ok() => {
+            preview.to_string_lossy().to_string()
+        }
+        _ => full,
+    }
+}
+
+fn shrink(bytes: &[u8]) -> Option<Vec<u8>> {
+    use image::codecs::jpeg::JpegEncoder;
+    use image::{ExtendedColorType, ImageEncoder};
+
+    let decoded = image::load_from_memory(bytes).ok()?;
+    if decoded.width().max(decoded.height()) <= PREVIEW_SIDE {
+        return None;
+    }
+
+    let rgb = decoded
+        .resize(
+            PREVIEW_SIDE,
+            PREVIEW_SIDE,
+            image::imageops::FilterType::Lanczos3,
+        )
+        .to_rgb8();
+
+    let mut jpeg = Vec::new();
+    JpegEncoder::new_with_quality(&mut jpeg, PREVIEW_QUALITY)
+        .write_image(
+            rgb.as_raw(),
+            rgb.width(),
+            rgb.height(),
+            ExtendedColorType::Rgb8,
+        )
+        .ok()?;
+    Some(jpeg)
+}
+
 pub(crate) async fn forget_cached_cover(media_dir: &Path, channel_id: &str, hash: &str) {
     tokio::fs::remove_file(media_paths::cover_path(media_dir, channel_id, hash))
         .await
@@ -394,11 +418,11 @@ pub(crate) async fn forget_cached_cover(media_dir: &Path, channel_id: &str, hash
     tokio::fs::remove_file(media_paths::no_cover_path(media_dir, channel_id, hash))
         .await
         .ok();
+    tokio::fs::remove_file(media_paths::cover_preview_path(media_dir, channel_id, hash))
+        .await
+        .ok();
 }
 
-/// Paths only, for mosaic tiles. Not `ensure_cover` in a loop: that one also
-/// bins the pixels for a palette, which is ruinous sixty tiles at a time.
-/// Tracks with no artwork are absent from the result.
 pub(crate) async fn cover_paths(
     db: &SqlitePool,
     media_dir: &Path,
@@ -417,7 +441,8 @@ pub(crate) async fn cover_paths(
 
         let cover = media_paths::cover_path(media_dir, &track.channel_id, &track.file_hash);
         if tokio::fs::metadata(&cover).await.is_ok_and(|m| m.len() > 0) {
-            found.insert(track_id.clone(), cover.to_string_lossy().to_string());
+            let preview = ensure_preview(media_dir, &track.channel_id, &track.file_hash).await;
+            found.insert(track_id.clone(), preview);
             continue;
         }
 
@@ -439,7 +464,8 @@ pub(crate) async fn cover_paths(
         match picture {
             Some(bytes) if !bytes.is_empty() => {
                 tokio::fs::write(&cover, &bytes).await?;
-                found.insert(track_id.clone(), cover.to_string_lossy().to_string());
+                let preview = ensure_preview(media_dir, &track.channel_id, &track.file_hash).await;
+                found.insert(track_id.clone(), preview);
             }
             _ => {
                 tokio::fs::write(&no_cover, []).await?;
@@ -449,8 +475,6 @@ pub(crate) async fn cover_paths(
     Ok(found)
 }
 
-/// Extracted once and kept beside the audio; files without a picture get a
-/// marker instead. None when there is nothing to show.
 pub(crate) async fn ensure_cover(
     db: &SqlitePool,
     media_dir: &Path,
@@ -471,12 +495,11 @@ pub(crate) async fn ensure_cover(
         return Ok(None);
     }
     if let Ok(meta) = tokio::fs::metadata(&cover).await {
-        // the older marker was written for anything the strict parser refused,
-        // so those verdicts are worth taking again
         if meta.len() > 0 {
             let bytes = tokio::fs::read(&cover).await.unwrap_or_default();
             return Ok(Some(Cover {
                 path: cover.to_string_lossy().to_string(),
+                preview: ensure_preview(media_dir, &track.channel_id, &track.file_hash).await,
                 palette: tokio::task::spawn_blocking(move || palette_of(&bytes))
                     .await
                     .unwrap_or_default(),
@@ -501,6 +524,7 @@ pub(crate) async fn ensure_cover(
             tokio::fs::write(&cover, &bytes).await?;
             Ok(Some(Cover {
                 path: cover.to_string_lossy().to_string(),
+                preview: ensure_preview(media_dir, &track.channel_id, &track.file_hash).await,
                 palette: tokio::task::spawn_blocking(move || palette_of(&bytes))
                     .await
                     .unwrap_or_default(),

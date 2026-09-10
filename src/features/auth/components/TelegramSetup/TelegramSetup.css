@@ -57,9 +57,6 @@
   color: var(--text-dim);
   cursor: pointer;
   transform: rotate(90deg);
-  transition:
-    color var(--duration-shortest) var(--ease-out),
-    background var(--duration-shortest) var(--ease-out);
 }
 .setup-arrow.is-next {
   transform: rotate(-90deg);
@@ -99,21 +96,17 @@
   width: 100%;
   padding: 10px 14px;
   margin-bottom: 20px;
-  border: 1px solid var(--border-strong);
+  border: none;
   border-radius: var(--radius-sm);
-  background: transparent;
+  background: var(--bg-elevated-2);
   color: var(--text);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition:
-    background var(--duration-shortest) var(--ease-out),
-    border-color var(--duration-shortest) var(--ease-out);
 }
 .setup-portal:hover {
   background: var(--bg-hover);
-  border-color: var(--accent-base);
 }
 
 .setup-form {

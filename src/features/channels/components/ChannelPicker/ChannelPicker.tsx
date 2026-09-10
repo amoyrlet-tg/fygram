@@ -33,7 +33,7 @@ export function ChannelPicker({ onClose, onAdded }: { onClose: () => void; onAdd
     <div className={`modal-backdrop${closing ? " is-closing" : ""}`} onClick={requestClose}>
       <div className={`modal${closing ? " is-closing" : ""}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{t("Add channels & groups")}</h2>
+          <h2>{t("Add channel")}</h2>
           <button className="icon-btn" onClick={requestClose} aria-label={t("Close")}>
             ×
           </button>
@@ -41,7 +41,7 @@ export function ChannelPicker({ onClose, onAdded }: { onClose: () => void; onAdd
 
         <form className="channel-picker-manual" onSubmit={addByLink}>
           <input
-            placeholder={t("Paste a t.me link or @username…")}
+            placeholder={t("Link or @username")}
             value={link}
             onChange={(e) => setLink(e.target.value)}
             autoFocus

@@ -52,24 +52,23 @@ tools/
 # Anything that would sign a release or unlock an account. None of it has ever
 # been in the repo; these lines are here so it cannot start.
 *.jks
-*.keystore
-key.properties
-keystore.properties
-local.properties
 .env
 .env.*
 *.session
 *.session.bak
 api_credentials.json
 
-# The generated mobile projects. Their own sources are committed - MainActivity,
-# the media notification, the icons - but everything gradle and xcode build from
-# them is not; the nested .gitignore files inside gen/android draw that line.
-src-tauri/gen/apple/
-
-# Cross-built ffmpeg and the apks it ends up inside. Built by
-# packaging/ffmpeg/build-audio.sh and by `tauri android build`, never committed.
-/ffmpeg-android-*/
+# Built by packaging/ffmpeg/build-audio.sh, never committed.
 /ffmpeg-prefix/
-*.apk
-*.aab
+
+# Telegram Desktop's own sources, kept here only to read the protocol from.
+# Ninety-odd megabytes of somebody else's project, and not ours to publish.
+/fadesktop/
+/desktop/
+
+# House notes on how the code is written. They are for whoever is writing it.
+STYLE.md
+
+# The phone-shaped layout, kept locally to try the app at that size. Not part
+# of the desktop build and not published.
+/mobilefrontend/

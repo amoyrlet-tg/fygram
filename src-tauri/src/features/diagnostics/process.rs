@@ -1,17 +1,7 @@
-//! What the operating system says our processes are holding.
-//!
-//! The webview runs in processes of its own, so asking only about ourselves
-//! answers the wrong question: on Windows the renderer is where the memory
-//! goes, and it is a child of ours, not us.
-
-/// One process of ours, as the system reports it.
 pub(crate) struct ProcSample {
     pub(crate) name: String,
     pub(crate) pid: u32,
-    /// Resident/working set: what is in RAM right now.
     pub(crate) working_set: u64,
-    /// Private/committed: what cannot be shared away, the number that grows
-    /// when something leaks.
     pub(crate) private: u64,
 }
 
@@ -55,7 +45,6 @@ pub(crate) fn tree() -> Vec<ProcSample> {
         let _ = CloseHandle(snapshot);
     }
 
-    // the webview's own children hang off it, not off us, so walk the tree
     let mut wanted: Vec<u32> = vec![ours];
     loop {
         let before = wanted.len();
@@ -99,7 +88,6 @@ pub(crate) fn tree() -> Vec<ProcSample> {
 pub(crate) fn tree() -> Vec<ProcSample> {
     fn read(pid: u32) -> Option<(u32, String, u64, u64)> {
         let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-        // the comm field is parenthesised and may itself contain spaces
         let close = stat.rfind(')')?;
         let name = stat.get(stat.find('(')? + 1..close)?.to_string();
         let rest: Vec<&str> = stat.get(close + 2..)?.split_whitespace().collect();

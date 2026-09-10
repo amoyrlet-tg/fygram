@@ -9,6 +9,15 @@ function resolveAccent(accent: string | null): string | null {
   return accent.toLowerCase() === "#ffffff" ? WHITE_FALLBACK : accent;
 }
 
+function instantly(change: () => void) {
+  const root = document.documentElement;
+  root.setAttribute("data-switching", "");
+  change();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => root.removeAttribute("data-switching"));
+  });
+}
+
 function applyAccent(accent: string | null) {
   const resolved = resolveAccent(accent);
   if (resolved) {
@@ -18,7 +27,7 @@ function applyAccent(accent: string | null) {
   }
 }
 
-export function useTheme() {
+export function useTheme(profileAccent?: string | null) {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem("theme");
     if (saved === "light" || saved === "dark") return saved;
@@ -29,21 +38,26 @@ export function useTheme() {
   );
 
   useEffect(() => {
-    applyAccent(accent);
-  }, [accent]);
+    instantly(() => applyAccent(accent ?? profileAccent ?? null));
+  }, [accent, profileAccent]);
 
   const handleSetTheme = useCallback((next: Theme) => {
-    document.documentElement.dataset.theme = next;
+    instantly(() => {
+      document.documentElement.dataset.theme = next;
+    });
     localStorage.setItem("theme", next);
     setThemeState(next);
   }, []);
 
-  const handleSetAccent = useCallback((next: string | null) => {
-    if (next) localStorage.setItem("accentColor", next);
-    else localStorage.removeItem("accentColor");
-    applyAccent(next);
-    setAccentState(next);
-  }, []);
+  const handleSetAccent = useCallback(
+    (next: string | null) => {
+      if (next) localStorage.setItem("accentColor", next);
+      else localStorage.removeItem("accentColor");
+      instantly(() => applyAccent(next ?? profileAccent ?? null));
+      setAccentState(next);
+    },
+    [profileAccent],
+  );
 
   return { theme, accent, handleSetTheme, handleSetAccent };
 }

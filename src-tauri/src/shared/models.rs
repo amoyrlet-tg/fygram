@@ -1,5 +1,3 @@
-//! The rows that cross the IPC boundary, exactly as both sides see them.
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -15,9 +13,7 @@ pub(crate) struct Channel {
     pub(crate) last_full_synced_at: Option<DateTime<Utc>>,
     pub(crate) is_active: bool,
 
-    /// None means Telegram has never been asked - see migration 0013.
     pub(crate) can_edit: Option<bool>,
-    /// What replacing a forwarded track needs.
     pub(crate) can_repost: Option<bool>,
     pub(crate) rights_checked_at: Option<DateTime<Utc>>,
 }
@@ -38,8 +34,6 @@ pub(crate) struct Track {
     pub(crate) play_count: i64,
     pub(crate) published_at: Option<DateTime<Utc>>,
 
-    /// A forward cannot be edited, only replaced. None means no sync has
-    /// looked yet - see migration 0014.
     pub(crate) forwarded: Option<bool>,
     pub(crate) forwarded_from: Option<String>,
     pub(crate) forwarded_at: Option<DateTime<Utc>>,
@@ -53,6 +47,5 @@ pub(crate) struct Playlist {
     pub(crate) smart_rule: Option<String>,
     pub(crate) created_at: DateTime<Utc>,
 
-    /// None means the interface builds one out of its tracks' covers.
     pub(crate) cover_path: Option<String>,
 }

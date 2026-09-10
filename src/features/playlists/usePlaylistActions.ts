@@ -32,9 +32,20 @@ export function usePlaylistActions(opts: {
   const t = useT();
 
   const handleCreatePlaylist = useCallback(
-    async (name: string) => {
+    async (name: string, coverPath?: string | null) => {
       try {
         const playlist = await playlistsApi.createPlaylist(name);
+        if (coverPath) {
+          try {
+            await playlistsApi.setPlaylistCover(playlist.id, coverPath);
+          } catch (err) {
+            showToast({
+              key: "playlist-cover",
+              kind: "warn",
+              message: String(err),
+            });
+          }
+        }
         refreshPlaylists();
         setView({ kind: "playlist", playlistId: playlist.id });
         if (isOffline()) {

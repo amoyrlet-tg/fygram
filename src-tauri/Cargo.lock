@@ -1563,7 +1563,7 @@ dependencies = [
 
 [[package]]
 name = "fygram"
-version = "0.6.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1576,9 +1576,8 @@ dependencies = [
  "grammers-mtsender",
  "grammers-session",
  "image",
- "jni 0.21.1",
+ "libc",
  "lofty",
- "ndk-context",
  "regex",
  "reqwest",
  "rodio",

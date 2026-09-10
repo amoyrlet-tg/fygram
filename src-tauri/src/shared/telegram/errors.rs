@@ -1,5 +1,3 @@
-//! Telling the errors that mean something apart from the ones that do not: a dead session, a peer that is gone.
-
 fn chain_contains(err: &anyhow::Error, names: &[&str]) -> bool {
     let text = format!("{err:#}").to_uppercase();
     names.iter().any(|name| text.contains(name))
@@ -20,8 +18,6 @@ pub(crate) fn is_dead_session(err: &anyhow::Error) -> bool {
     )
 }
 
-/// "Not allowed to change this message", as opposed to a dropped line. Telegram
-/// only says it after the file has gone up the wire.
 pub(crate) fn is_edit_forbidden(err: &anyhow::Error) -> bool {
     chain_contains(
         err,

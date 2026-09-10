@@ -1,5 +1,3 @@
-//! The IPC surface of the tracks feature.
-
 use tauri::{AppHandle, State};
 
 use crate::features::library::media;
@@ -13,7 +11,6 @@ pub(crate) async fn list_tracks(state: State<'_, AppState>) -> Result<Vec<Track>
     Box::pin(async move { service::list(state).await.map_err(String::from) }).await
 }
 
-/// None means the file carries no picture.
 #[tauri::command]
 pub(crate) async fn track_cover(
     state: State<'_, AppState>,
@@ -57,7 +54,6 @@ pub(crate) async fn update_track(
     .await
 }
 
-/// Not an edit: the old message is taken down and a new one posted.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn repost_track(
@@ -97,7 +93,6 @@ pub(crate) async fn search_tracks(
     Box::pin(async move { service::search(state, query).await.map_err(String::from) }).await
 }
 
-/// Paths only, no palettes - see `media::covers::cover_paths`.
 #[tauri::command]
 pub(crate) async fn track_cover_paths(
     state: State<'_, AppState>,

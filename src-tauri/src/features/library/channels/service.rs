@@ -1,5 +1,3 @@
-//! Adding a channel, keeping it in step with Telegram, and taking it away again.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -38,20 +36,14 @@ pub(crate) async fn resolve_channel_info(
     }
 }
 
-/// Sent when a channel's editing right turns out to differ from what the
-/// interface was showing.
 #[derive(Clone, serde::Serialize)]
 pub(crate) struct RightsChanged {
     pub(crate) channel_id: String,
     pub(crate) title: String,
     pub(crate) can_edit: bool,
-    /// True when Telegram had just refused an edit, rather than a routine
-    /// refresh.
     pub(crate) after_refusal: bool,
 }
 
-/// Asks Telegram what we may do here and writes the answer down. One call, no
-/// message walk.
 pub(crate) async fn refresh_rights(
     state: &AppState,
     app: &AppHandle,
@@ -73,7 +65,18 @@ pub(crate) async fn refresh_rights(
 
     repository::set_edit_right(&state.db, channel_id, can_edit, info.can_repost).await?;
 
-    // a first answer is not a change: nobody was shown the old one
+    if repository::refresh_identity(
+        &state.db,
+        channel_id,
+        &info.title,
+        info.username.as_deref(),
+        info.access_hash,
+    )
+    .await?
+    {
+        let _ = app.emit("library-changed", ());
+    }
+
     if stored.can_edit.is_some_and(|was| was != can_edit) {
         let _ = app.emit(
             "channel-rights-changed",
@@ -88,6 +91,78 @@ pub(crate) async fn refresh_rights(
     }
 
     Ok(can_edit)
+}
+
+async fn editable(state: &State<'_, AppState>, channel_id: &str) -> Result<(i64, i64), AppError> {
+    let numeric: i64 = channel_id
+        .parse()
+        .map_err(|_| AppError::Msg(format!("{channel_id} is not a Telegram id")))?;
+    let stored = repository::edit_right(&state.db, channel_id)
+        .await?
+        .ok_or_else(|| AppError::Msg("channel not found".to_string()))?;
+    if stored.can_edit != Some(true) {
+        return Err(AppError::Msg(
+            "Нет прав на редактирование этого канала.".to_string(),
+        ));
+    }
+    Ok((numeric, stored.access_hash))
+}
+
+pub(crate) async fn rename(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    channel_id: String,
+    title: String,
+) -> Result<(), AppError> {
+    let title = title.trim().to_string();
+    if title.is_empty() {
+        return Err(AppError::Msg("Название не может быть пустым.".to_string()));
+    }
+    let (numeric, access_hash) = editable(&state, &channel_id).await?;
+
+    state
+        .telegram
+        .rename_channel(numeric, access_hash, &title)
+        .await
+        .map_err(|err| AppError::Msg(format!("Telegram не принял новое название: {err}")))?;
+
+    let device = crate::features::sync::stamp::device_id(&state.db).await;
+    repository::set_title(&state.db, &channel_id, &title, &device).await?;
+    queue_channels_sync(&state).await;
+    let _ = app.emit("library-changed", ());
+    Ok(())
+}
+
+pub(crate) async fn set_photo(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    channel_id: String,
+    path: String,
+) -> Result<(), AppError> {
+    let (numeric, access_hash) = editable(&state, &channel_id).await?;
+    let file = std::path::PathBuf::from(&path);
+    if !file.is_file() {
+        return Err(AppError::Msg(format!("Файла нет: {path}")));
+    }
+
+    state
+        .telegram
+        .set_channel_photo(numeric, access_hash, &file)
+        .await
+        .map_err(|err| AppError::Msg(format!("Telegram не принял картинку: {err}")))?;
+
+    let channel = repository::get(&state.db, &channel_id).await?;
+    if let Ok(app_dir) = app.path().app_data_dir() {
+        crate::features::cloud::service::fetch_and_store_channel_avatar(
+            &state.db,
+            &state.telegram,
+            &channel,
+            &app_dir,
+        )
+        .await;
+    }
+    let _ = app.emit("library-changed", ());
+    Ok(())
 }
 
 async fn queue_channels_sync(state: &AppState) {
@@ -125,10 +200,18 @@ pub(crate) async fn add_by_link(
 ) -> Result<Channel, AppError> {
     let parsed = parse_telegram_link(&link).ok_or_else(|| {
         AppError::Msg(
-            "Не похоже на ссылку/юзернейм Telegram-канала (t.me/... или @username)".to_string(),
+            "Не похоже на ссылку Telegram-канала. Подойдёт @имя, t.me/имя, \
+             ссылка на сообщение или адрес из web.telegram.org"
+                .to_string(),
         )
     })?;
     let info = resolve_channel_info(&state, parsed).await?;
+    if info.broadcast == Some(false) {
+        return Err(AppError::Msg(format!(
+            "«{}» - это группа, а не канал. Добавить можно только канал.",
+            info.title
+        )));
+    }
     let device = crate::features::sync::stamp::device_id(&state.db).await;
     let channel = repository::upsert_manual(&state.db, info, &device).await?;
     queue_channels_sync(&state).await;
@@ -144,19 +227,6 @@ pub(crate) async fn sync(
     depth: SyncDepth,
 ) -> Result<SyncStats, AppError> {
     run_channel_sync(&state, app, channel_id, depth).await
-}
-
-pub(crate) const SYNC_COOLDOWN: chrono::Duration = chrono::Duration::minutes(30);
-
-pub(crate) const QUICK_SYNC_COOLDOWN: chrono::Duration = chrono::Duration::minutes(3);
-
-fn cooldown_left(channel: &Channel, depth: SyncDepth) -> Option<chrono::Duration> {
-    let (last, cooldown) = match depth {
-        SyncDepth::Full => (channel.last_full_synced_at, SYNC_COOLDOWN),
-        SyncDepth::NewOnly => (channel.last_synced_at, QUICK_SYNC_COOLDOWN),
-    };
-    let elapsed = chrono::Utc::now() - last?;
-    (elapsed < cooldown).then(|| cooldown - elapsed)
 }
 
 fn channel_is_gone(telegram: &TelegramState, err: &anyhow::Error) -> bool {
@@ -177,19 +247,6 @@ async fn run_channel_sync(
     depth: SyncDepth,
 ) -> Result<SyncStats, AppError> {
     let channel = repository::get(&state.db, &channel_id).await?;
-
-    if let Some(left) = cooldown_left(&channel, depth) {
-        let minutes = left.num_minutes() + 1;
-        return Err(AppError::Msg(match depth {
-            SyncDepth::Full => format!(
-                "Канал целиком проверяли недавно. Следующий раз можно через {minutes} мин. \
-                 Быстрая синхронизация доступна."
-            ),
-            SyncDepth::NewOnly => format!(
-                "Канал уже синхронизировался недавно. Следующий раз можно через {minutes} мин."
-            ),
-        }));
-    }
 
     let cancel = Arc::new(AtomicBool::new(false));
     state
@@ -244,7 +301,6 @@ async fn run_channel_sync(
             _ => {}
         }
 
-        // already talking to the channel, so the cheapest moment to ask
         if let Err(err) = refresh_rights(state, &app, &channel_id).await {
             crate::log!("sync({channel_id}): could not refresh the edit rights: {err}");
         }

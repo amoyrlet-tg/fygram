@@ -1,8 +1,3 @@
-//! What Telegram will let us do to a track's message.
-//!
-//! An edit is a download, a tag write and an upload, and the server only
-//! refuses at the end of all three - so it is asked here, at the front.
-
 use tauri::{AppHandle, Emitter, State};
 
 use crate::features::library::channels::repository as channels_repository;
@@ -10,8 +5,6 @@ use crate::features::library::channels::service::{self as channels_service, Righ
 use crate::shared::error::AppError;
 use crate::AppState;
 
-/// Names the channel and says what to do: "Telegram rejected the edit" on its
-/// own leaves the user nowhere to go.
 fn no_rights_message(title: &str) -> String {
     format!(
         "Нет прав редактировать сообщения в «{title}». \
@@ -19,8 +12,6 @@ fn no_rights_message(title: &str) -> String {
     )
 }
 
-/// An unknown right is not a refusal: one call settles it, which is far
-/// cheaper than the download, tag write and upload it guards.
 pub(super) async fn ensure_may_edit(
     state: &State<'_, AppState>,
     app: &AppHandle,
@@ -32,7 +23,6 @@ pub(super) async fn ensure_may_edit(
 
     let can_edit = match stored.can_edit {
         Some(known) => known,
-        // a lookup that fails must not block an edit that might have worked
         None => match channels_service::refresh_rights(state, app, channel_id).await {
             Ok(fresh) => fresh,
             Err(err) => {
@@ -48,8 +38,6 @@ pub(super) async fn ensure_may_edit(
     Err(AppError::Msg(no_rights_message(&stored.title)))
 }
 
-/// Only a rights refusal is written down: a dropped connection says nothing
-/// about what this account may do.
 pub(super) async fn refusal(
     state: &State<'_, AppState>,
     app: &AppHandle,
@@ -85,7 +73,6 @@ pub(super) async fn refusal(
     AppError::Msg(no_rights_message(&title))
 }
 
-/// Refuses a repost the channel would refuse, before anything is uploaded.
 pub(super) async fn ensure_may_repost(
     state: &State<'_, AppState>,
     app: &AppHandle,

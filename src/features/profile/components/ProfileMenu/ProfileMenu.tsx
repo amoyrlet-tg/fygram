@@ -1,41 +1,28 @@
-import { useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { UserAvatar } from "@/shared/ui/UserAvatar";
-import { initials } from "@/shared/lib/initials";
-import { avatarGradientCss } from "@/shared/lib/avatarColor";
 import { useT } from "@/shared/i18n";
 import { useSettings } from "@/app/providers/SettingsProvider";
 import { requestRelogin, useSessionInvalid } from "@/features/auth/sessionStatus";
 import { useLogout } from "@/features/auth/useLogout";
-import { BroadcastSettings } from "@/features/broadcast/components/BroadcastSettings";
 import { CacheCleanup } from "@/features/profile/components/CacheCleanup";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
-import { useIsNarrow } from "@/shared/hooks/useNarrowLayout";
-import { useIsDesktopHost } from "@/platforms/host";
 import { LanguageSwitcher } from "@/shared/ui/LanguageSwitcher";
-import { ThemePicker } from "@/features/profile/components/ThemePicker";
-import { EmojiStatus } from "@/features/profile/components/EmojiStatus";
-import { BroadcastIcon, CheckIcon, ChevronDownIcon, CopyIcon } from "@/shared/ui/icons";
+import { AccentSwatches, ThemeCards } from "@/features/profile/components/ThemePicker";
+import { ProfileCover } from "@/features/profile/components/ProfileCover";
+import { ProfileMusicBar } from "@/features/profile/components/ProfileMusicBar";
+import { ProfileMusicDialog } from "@/features/profile/components/ProfileMusicDialog";
+import { useProfileMusic } from "@/features/profile/useProfileMusic";
+import { AudioOutput } from "@/features/player/components/AudioOutput";
+import { TgIcon } from "@/shared/ui/TgIcon";
+import { ArrowLeftIcon } from "@/shared/ui/icons";
 import "./ProfileMenu.css";
 
-const NAME_MAX_CHARS = 7;
+type Page = "root" | "storage";
 
-const MENU_WIDTH = 460;
-const EDGE_MARGIN = 16;
-const GAP = 10;
-const MIN_SPACE_BELOW = 260;
+const PAGE_SLIDE_MS = 260;
+const DIALOG_MARGIN = 64;
 
-interface MenuPos {
-  top?: number;
-  bottom?: number;
-  left?: number;
-  right?: number;
-  originX: "left" | "right";
-  originY: "top" | "bottom";
-}
-
-export function ProfileMenu({ className }: { className?: string }) {
+export function ProfileMenu() {
   const {
     currentUser,
     theme,
@@ -46,30 +33,23 @@ export function ProfileMenu({ className }: { className?: string }) {
     toggleProfileSync,
     autostartEnabled,
     toggleAutostart,
-    fullscreenEnabled,
-    toggleFullscreen,
     ducking,
     toggleDucking,
+    ecoMode,
+    toggleEcoMode,
+    ecoKeepsArt,
+    toggleEcoKeepsArt,
   } = useSettings();
   const t = useT();
-  const isNarrow = useIsNarrow();
-  // a desktop notion, not a width one - see src/platforms/README.md
-  const isDesktop = useIsDesktopHost();
   const sessionInvalid = useSessionInvalid();
-  const displayName = currentUser
-    ? currentUser.first_name.trim().length > NAME_MAX_CHARS
-      ? `${currentUser.first_name.trim().slice(0, NAME_MAX_CHARS)}…`
-      : currentUser.first_name.trim()
-    : "";
-  const fullName = currentUser
-    ? `${currentUser.first_name}${currentUser.last_name ? " " + currentUser.last_name : ""}`.trim()
-    : "";
-  const userSeed = currentUser ? String(currentUser.id) : "user";
-  const [copied, setCopied] = useState(false);
 
   const [open, setOpen] = useState(false);
-  const [cacheCleanupOpen, setCacheCleanupOpen] = useState(false);
-  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [page, setPage] = useState<Page>("root");
+  const [sliding, setSliding] = useState(false);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const paneRefs = useRef<Record<Page, HTMLDivElement | null>>({ root: null, storage: null });
+  const slideFrom = useRef<Page>("root");
+  const [syncAsk, setSyncAsk] = useState(false);
   const {
     logoutConfirmStep,
     handleLogout,
@@ -78,272 +58,285 @@ export function ProfileMenu({ className }: { className?: string }) {
     finalizeLogout,
   } = useLogout();
   const [closing, setClosing] = useState(false);
-  const [pos, setPos] = useState<MenuPos | null>(null);
-  const chipRef = useRef<HTMLButtonElement>(null);
+  const [entering, setEntering] = useState(false);
+  const headRef = useRef<HTMLElement | null>(null);
 
-  const openMenu = () => {
-    const rect = chipRef.current?.getBoundingClientRect();
-    if (isNarrow) {
-      setPos({ top: 0, left: 0, right: 0, originX: "right", originY: "top" });
-    } else if (rect) {
-      const spaceRight = window.innerWidth - rect.left;
-      const originX: "left" | "right" = spaceRight >= MENU_WIDTH + EDGE_MARGIN ? "left" : "right";
-      const rawLeft = originX === "left" ? rect.left : rect.right - MENU_WIDTH;
-      const left = Math.max(
-        EDGE_MARGIN,
-        Math.min(rawLeft, window.innerWidth - MENU_WIDTH - EDGE_MARGIN),
-      );
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const opensUp = spaceBelow < MIN_SPACE_BELOW && rect.top > spaceBelow;
-      setPos(
-        opensUp
-          ? { bottom: window.innerHeight - rect.top + GAP, left, originX, originY: "bottom" }
-          : { top: rect.bottom + GAP, left, originX, originY: "top" },
-      );
-    }
+  useEffect(() => {
+    if (!entering) return;
+    const done = window.setTimeout(() => setEntering(false), 240);
+    return () => window.clearTimeout(done);
+  }, [entering]);
+
+  const finishClose = () => {
+    setOpen(false);
     setClosing(false);
-    setOpen(true);
+    setPage("root");
+    setSliding(false);
   };
+
+  const goTo = (next: Page) => {
+    if (next === page || sliding) return;
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      setPage(next);
+      return;
+    }
+    viewport.style.flex = "none";
+    viewport.style.height = `${viewport.offsetHeight}px`;
+    slideFrom.current = page;
+    setSliding(true);
+    requestAnimationFrame(() => setPage(next));
+  };
+
+  useLayoutEffect(() => {
+    if (!sliding || page === slideFrom.current) return;
+    const viewport = viewportRef.current;
+    const content = paneRefs.current[page]?.firstElementChild;
+    if (!viewport || !(content instanceof HTMLElement)) return;
+    const room = window.innerHeight - DIALOG_MARGIN - (headRef.current?.offsetHeight ?? 0);
+    viewport.style.height = `${Math.min(content.scrollHeight, room)}px`;
+  }, [sliding, page]);
+
+  const settle = () => {
+    setSliding(false);
+    const viewport = viewportRef.current;
+    if (viewport) {
+      viewport.style.height = "";
+      viewport.style.flex = "";
+    }
+  };
+
+  useEffect(() => {
+    if (!sliding) return;
+    const id = window.setTimeout(settle, PAGE_SLIDE_MS + 120);
+    return () => window.clearTimeout(id);
+  }, [sliding]);
 
   const requestClose = () => {
     if (!open || closing) return;
-    setClosing(true);
+    if (ecoMode) finishClose();
+    else setClosing(true);
   };
 
-  const toggleMenu = () => {
-    if (open) requestClose();
-    else openMenu();
-  };
-
-  const copyUserId = async () => {
-    if (!currentUser) return;
-    try {
-      await navigator.clipboard.writeText(String(currentUser.id));
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const avatar = currentUser?.avatar_path ? (
-    <UserAvatar className="profile-avatar profile-avatar-img" path={currentUser.avatar_path} />
-  ) : (
-    <span className="profile-avatar" style={{ background: avatarGradientCss(userSeed) }}>
-      {initials(fullName)}
-    </span>
-  );
+  const music = useProfileMusic();
+  const [musicOpen, setMusicOpen] = useState(false);
 
   return (
     <>
-      <button
-        ref={chipRef}
-        className={`profile-chip ${open ? "is-open" : ""}${sessionInvalid ? " has-alert" : ""}${className ? ` ${className}` : ""}`}
-        onClick={toggleMenu}
-        aria-label={sessionInvalid ? t("Telegram session expired") : t("Settings")}
-      >
-        {avatar}
-        <ChevronDownIcon size={13} className="profile-chip-chevron" />
-      </button>
+      <ProfileCover
+        user={currentUser}
+        dark={theme === "dark"}
+        alert={sessionInvalid}
+        action={
+          <button
+            className="profile-cover-settings-btn"
+            onClick={() => {
+              setClosing(false);
+              setEntering(true);
+              setOpen(true);
+            }}
+            aria-label={t("Settings")}
+            title={t("Settings")}
+          >
+            <TgIcon name="settings" size={18} />
+          </button>
+        }
+        music={
+          <ProfileMusicBar
+            tracks={music.tracks}
+            loading={music.loading}
+            onOpen={() => setMusicOpen(true)}
+          />
+        }
+      />
+
+      {musicOpen && (
+        <ProfileMusicDialog
+          tracks={music.tracks}
+          loading={music.loading}
+          onAdd={music.add}
+          onRemove={music.remove}
+          onMove={music.move}
+          onRefresh={music.refresh}
+          nowPlayingSync={profileSyncEnabled}
+          onNowPlayingSync={(next) => {
+            if (next) setSyncAsk(true);
+            else toggleProfileSync(false);
+          }}
+          onClose={() => setMusicOpen(false)}
+        />
+      )}
+
       {open &&
-        pos &&
         createPortal(
           <>
             <div
-              className={`profile-menu-backdrop${closing ? " is-closing" : ""}`}
+              className={`settings-backdrop${closing ? " is-closing" : ""}${entering ? " is-entering" : ""}`}
               onClick={requestClose}
             />
             <div
-              className={`profile-menu${isNarrow ? " profile-menu-full" : ""}${closing ? " is-closing" : ""}`}
-              style={{
-                top: pos.top,
-                bottom: pos.bottom,
-                left: pos.left,
-                right: pos.right,
-                maxHeight: isNarrow
-                  ? `calc(var(--app-height) - ${EDGE_MARGIN}px)`
-                  : `calc(var(--app-height) - ${EDGE_MARGIN * 2}px)`,
-                transformOrigin: `${pos.originY} ${pos.originX}`,
-              }}
+              className={`settings-dialog${closing ? " is-closing" : ""}${entering ? " is-entering" : ""}`}
+              role="dialog"
+              aria-modal="true"
+              aria-label={t("Settings")}
               onAnimationEnd={() => {
-                if (closing) {
-                  setOpen(false);
-                  setClosing(false);
-                }
+                if (closing) finishClose();
               }}
             >
-              {sessionInvalid && (
-                <div className="profile-session-alert">
-                  <div className="profile-session-alert-text">
-                    <strong>{t("Telegram session expired")}</strong>
-                    <span>
-                      {t(
-                        "Downloaded music keeps playing. Log in again to sync and add new tracks.",
-                      )}
-                    </span>
-                  </div>
+              <header className="settings-head" ref={headRef}>
+                {page !== "root" && (
                   <button
-                    className="btn btn-primary profile-session-alert-btn"
-                    onClick={() => {
-                      requestClose();
-                      requestRelogin();
-                    }}
+                    className="settings-back"
+                    onClick={() => goTo("root")}
+                    aria-label={t("Back")}
+                    title={t("Back")}
                   >
-                    {t("Log in again")}
+                    <ArrowLeftIcon size={19} />
                   </button>
-                </div>
-              )}
-              <div className="profile-menu-columns">
-                <div className="profile-menu-col">
-                  <div className="profile-menu-head">
-                    {avatar}
-                    <div className="profile-info">
-                      <span className="profile-name-row">
-                        <span className="profile-fullname truncate">{displayName}</span>
-                        {currentUser?.emoji_status && (
-                          <EmojiStatus status={currentUser.emoji_status} size={19} />
+                )}
+                <h2 className="settings-title">{page === "root" ? t("Settings") : t("Storage")}</h2>
+                <button className="settings-close" onClick={requestClose} aria-label={t("Close")}>
+                  <TgIcon name="close" size={20} />
+                </button>
+              </header>
+
+              <div className="settings-pages" ref={viewportRef}>
+                <div
+                  className={`settings-track${sliding ? " is-sliding" : ""}${
+                    sliding && page === "storage" ? " is-second" : ""
+                  }`}
+                  onTransitionEnd={(e) => {
+                    if (e.propertyName === "transform" && e.target === e.currentTarget) settle();
+                  }}
+                >
+                  {(page === "root" || sliding) && (
+                    <div
+                      className="settings-pane"
+                      ref={(el) => {
+                        paneRefs.current.root = el;
+                      }}
+                      aria-hidden={page !== "root"}
+                    >
+                      <div className="settings-body">
+                        {sessionInvalid && (
+                          <div className="settings-alert">
+                            <div className="settings-alert-text">
+                              <strong>{t("Telegram session expired")}</strong>
+                              <span>
+                                {t(
+                                  "Downloaded music keeps playing. Log in again to sync and add new tracks.",
+                                )}
+                              </span>
+                            </div>
+                            <button
+                              className="btn btn-primary settings-alert-btn"
+                              onClick={() => {
+                                requestClose();
+                                requestRelogin();
+                              }}
+                            >
+                              {t("Log in again")}
+                            </button>
+                          </div>
                         )}
-                      </span>
-                      <div className="profile-id-row">
-                        <span className="profile-id">{currentUser ? currentUser.id : ""}</span>
-                        <button
-                          className={`icon-btn ${copied ? "is-on" : ""}`}
-                          title={t(copied ? "Copied" : "Copy user ID")}
-                          onClick={copyUserId}
-                          disabled={!currentUser}
-                        >
-                          {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-                        </button>
+
+                        <div className="settings-list">
+                          <div className="settings-group">
+                            <div className="settings-row is-stacked settings-appearance">
+                              <span className="settings-heading">{t("Themes")}</span>
+                              <ThemeCards theme={theme} onSetTheme={setTheme} />
+                              <AccentSwatches accent={accent} onSetAccent={setAccent} />
+                            </div>
+                            <div className="settings-row settings-language">
+                              <span className="settings-row-title">Language</span>
+                              <LanguageSwitcher />
+                            </div>
+                          </div>
+
+                          <div className="settings-group">
+                            <ToggleRow
+                              icon={<TgIcon name="music" size={22} />}
+                              title={t("Sync with profile")}
+                              checked={profileSyncEnabled}
+                              onChange={(next) => {
+                                if (next) setSyncAsk(true);
+                                else toggleProfileSync(false);
+                              }}
+                            />
+                            <ToggleRow
+                              icon={<TgIcon name="volume" size={22} />}
+                              title={t("Turn down while Telegram is playing")}
+                              note={
+                                ducking.supported
+                                  ? undefined
+                                  : t("This system cannot tell which app is making sound")
+                              }
+                              checked={ducking.enabled}
+                              disabled={!ducking.supported}
+                              onChange={toggleDucking}
+                            />
+                            <AudioOutput />
+                          </div>
+
+                          <div className="settings-group">
+                            <ToggleRow
+                              icon={<TgIcon name="newWindow" size={22} />}
+                              title={t("Launch at startup")}
+                              checked={autostartEnabled}
+                              onChange={toggleAutostart}
+                            />
+                          </div>
+
+                          <div className="settings-group">
+                            <SettingsRow
+                              icon={<TgIcon name="storage" size={22} />}
+                              title={t("Free up space…")}
+                              onClick={() => goTo("storage")}
+                            />
+                            <ToggleRow
+                              icon={<TgIcon name="eco" size={22} />}
+                              title={t("Eco mode")}
+                              note={t("No blur, no animation — uses far less memory")}
+                              checked={ecoMode}
+                              onChange={toggleEcoMode}
+                            />
+                            {ecoMode && (
+                              <ToggleRow
+                                nested
+                                icon={<TgIcon name="artwork" size={20} />}
+                                title={t("Keep the artwork")}
+                                note={t(
+                                  "Covers are the costly half — initials stand in without them",
+                                )}
+                                checked={ecoKeepsArt}
+                                onChange={toggleEcoKeepsArt}
+                              />
+                            )}
+                            <SettingsRow
+                              icon={<TgIcon name="leave" size={22} />}
+                              title={t("Log out…")}
+                              danger
+                              onClick={() => {
+                                requestClose();
+                                handleLogout();
+                              }}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <ThemePicker
-                    theme={theme}
-                    accent={accent}
-                    onSetTheme={setTheme}
-                    onSetAccent={setAccent}
-                  />
-                </div>
-                <div className="profile-menu-col-divider" />
-                <div className="profile-menu-col">
-                  <div className="profile-setting-row">
-                    <span>{t("Language")}</span>
-                    <LanguageSwitcher />
-                  </div>
-                  <div className="profile-setting-row">
-                    <span>{t("Sync with profile")}</span>
-                    <label
-                      className="toggle"
-                      title={t("Show your currently playing track in your Telegram profile.")}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={profileSyncEnabled}
-                        onChange={(e) => toggleProfileSync(e.target.checked)}
-                      />
-                      <span className="toggle-track" />
-                    </label>
-                  </div>
-                  {isDesktop && (
-                    <div className="profile-setting-row">
-                      <span>{t("Launch at startup")}</span>
-                      <label
-                        className="toggle"
-                        title={t("Automatically start the app when you log into your OS.")}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={autostartEnabled}
-                          onChange={(e) => toggleAutostart(e.target.checked)}
-                        />
-                        <span className="toggle-track" />
-                      </label>
-                    </div>
                   )}
-                  {isDesktop && (
-                    <div className="profile-setting-row">
-                      <span>{t("Always open in fullscreen")}</span>
-                      <label
-                        className="toggle"
-                        title={t("Press F11 anytime to toggle fullscreen.")}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={fullscreenEnabled}
-                          onChange={(e) => toggleFullscreen(e.target.checked)}
-                        />
-                        <span className="toggle-track" />
-                      </label>
-                    </div>
-                  )}
-                  {isDesktop && (
-                    <div className="profile-setting-row">
-                      <span>{t("Turn down while Telegram is playing")}</span>
-                      <label
-                        className="toggle"
-                        title={
-                          ducking.supported
-                            ? t(
-                                "Drops the music to the background while anything plays in Telegram, and brings it back afterwards. It never stops.",
-                              )
-                            : t("This system can't tell which app is making sound.")
-                        }
-                      >
-                        <input
-                          type="checkbox"
-                          checked={ducking.enabled}
-                          disabled={!ducking.supported}
-                          onChange={(e) => toggleDucking(e.target.checked)}
-                        />
-                        <span className="toggle-track" />
-                      </label>
-                    </div>
-                  )}
-                  <div className="profile-menu-divider" />
-                  <div className="profile-bot-hint">
-                    {t("Download music in the")}{" "}
-                    <a
-                      className="profile-bot-link"
-                      href="https://t.me/wwloadbot"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        void openUrl("https://t.me/wwloadbot");
+                  {(page === "storage" || sliding) && (
+                    <div
+                      className="settings-pane"
+                      ref={(el) => {
+                        paneRefs.current.storage = el;
                       }}
+                      aria-hidden={page !== "storage"}
                     >
-                      @wwloadbot
-                    </a>
-                  </div>
-                  <div className="profile-menu-divider" />
-                  {isDesktop && (
-                    <button
-                      className="btn btn-ghost cache-cleanup-trigger"
-                      onClick={() => {
-                        requestClose();
-                        setBroadcastOpen(true);
-                      }}
-                    >
-                      <BroadcastIcon size={14} />
-                      {t("Broadcast now playing…")}
-                    </button>
+                      <CacheCleanup />
+                    </div>
                   )}
-                  <button
-                    className="btn btn-ghost cache-cleanup-trigger"
-                    onClick={() => {
-                      requestClose();
-                      setCacheCleanupOpen(true);
-                    }}
-                  >
-                    {t("Free up space…")}
-                  </button>
-                  <button
-                    className="btn btn-ghost danger-ghost cache-cleanup-trigger"
-                    onClick={() => {
-                      requestClose();
-                      handleLogout();
-                    }}
-                  >
-                    {t("Log out…")}
-                  </button>
                 </div>
               </div>
             </div>
@@ -351,8 +344,20 @@ export function ProfileMenu({ className }: { className?: string }) {
           document.body,
         )}
 
-      {broadcastOpen && <BroadcastSettings onClose={() => setBroadcastOpen(false)} />}
-      {cacheCleanupOpen && <CacheCleanup onClose={() => setCacheCleanupOpen(false)} />}
+      {syncAsk && (
+        <ConfirmDialog
+          title={t("Show what is playing in your profile?")}
+          message={t(
+            "Every track you have added to your profile will be removed. Only the one playing stays.",
+          )}
+          confirmLabel={t("Turn on")}
+          onConfirm={() => {
+            setSyncAsk(false);
+            toggleProfileSync(true);
+          }}
+          onCancel={() => setSyncAsk(false)}
+        />
+      )}
 
       {logoutConfirmStep === 1 && (
         <ConfirmDialog
@@ -377,5 +382,64 @@ export function ProfileMenu({ className }: { className?: string }) {
         />
       )}
     </>
+  );
+}
+
+function SettingsRow({
+  icon,
+  title,
+  onClick,
+  danger,
+}: {
+  icon: ReactNode;
+  title: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button className={`settings-row settings-link${danger ? " is-danger" : ""}`} onClick={onClick}>
+      <span className="settings-row-icon">{icon}</span>
+      <span className="settings-row-text">
+        <span className="settings-row-title">{title}</span>
+      </span>
+      <TgIcon name="submenuArrow" size={16} className="settings-row-chevron" />
+    </button>
+  );
+}
+
+function ToggleRow({
+  icon,
+  title,
+  note,
+  checked,
+  onChange,
+  disabled,
+  nested,
+}: {
+  icon?: ReactNode;
+  title: string;
+  note?: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+  nested?: boolean;
+}) {
+  return (
+    <label className={`settings-row${disabled ? " is-disabled" : ""}${nested ? " is-nested" : ""}`}>
+      <span className="settings-row-icon">{icon}</span>
+      <span className="settings-row-text">
+        <span className="settings-row-title">{title}</span>
+        {note && <span className="settings-row-note">{note}</span>}
+      </span>
+      <span className="toggle">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span className="toggle-track" />
+      </span>
+    </label>
   );
 }

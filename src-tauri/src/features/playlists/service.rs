@@ -1,5 +1,3 @@
-//! What the playlist commands do, and what they queue for the sync engine afterwards.
-
 use std::collections::HashMap;
 
 use chrono::Utc;
@@ -162,7 +160,6 @@ pub(crate) async fn rename(
     repository::get(&state.db, &playlist_id).await
 }
 
-/// Returns the path to store on the row.
 pub(crate) async fn store_cover(
     root: &std::path::Path,
     playlist_id: &str,
@@ -199,8 +196,6 @@ pub(crate) async fn drop_covers(
     }
 }
 
-/// Re-encoded rather than copied: a 12 MP photograph would travel to Telegram
-/// on every sync, and an unreadable file is refused before anything is written.
 pub(crate) async fn set_cover(
     state: State<'_, AppState>,
     app: AppHandle,
@@ -239,7 +234,6 @@ pub(crate) async fn clear_cover(
     repository::get(&state.db, &playlist_id).await
 }
 
-/// See `repository::cover_sources`.
 pub(crate) async fn cover_sources(
     state: State<'_, AppState>,
 ) -> Result<HashMap<String, Vec<String>>, AppError> {
@@ -249,4 +243,14 @@ pub(crate) async fn cover_sources(
         sources.entry(playlist_id).or_default().push(track_id);
     }
     Ok(sources)
+}
+
+pub(crate) async fn recent_adds(
+    state: State<'_, AppState>,
+    hours: i64,
+) -> Result<HashMap<String, i64>, AppError> {
+    Ok(repository::recent_adds(&state.db, hours)
+        .await?
+        .into_iter()
+        .collect())
 }

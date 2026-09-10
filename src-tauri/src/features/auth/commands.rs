@@ -1,5 +1,3 @@
-//! The IPC surface of signing in: the code, the password, and the api credentials both of them need first.
-
 use tauri::{AppHandle, State};
 
 use crate::shared::telegram::CurrentUser;

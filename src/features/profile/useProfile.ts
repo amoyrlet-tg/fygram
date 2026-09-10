@@ -9,7 +9,6 @@ const USER_REFRESH_MS = 120_000;
 export function useProfile() {
   const [profileSyncEnabled, setProfileSyncEnabled] = useState(false);
   const [autostartEnabled, setAutostartEnabled] = useState(false);
-  const [fullscreenEnabled, setFullscreenEnabled] = useState(false);
   const [ducking, setDucking] = useState<DuckingConfig>({
     enabled: false,
     supported: false,
@@ -19,7 +18,6 @@ export function useProfile() {
   useEffect(() => {
     profileApi.getProfileSyncEnabled().then(setProfileSyncEnabled).catch(console.error);
     profileApi.getAutostartEnabled().then(setAutostartEnabled).catch(console.error);
-    profileApi.getFullscreenEnabled().then(setFullscreenEnabled).catch(console.error);
     profileApi.getDuckingConfig().then(setDucking).catch(console.error);
   }, []);
 
@@ -30,10 +28,13 @@ export function useProfile() {
   useEffect(() => {
     refreshCurrentUser();
     const id = window.setInterval(refreshCurrentUser, USER_REFRESH_MS);
-    const unlisten = listen("library-changed", refreshCurrentUser);
+    const stops = [
+      listen("library-changed", refreshCurrentUser),
+      listen("account-changed", refreshCurrentUser),
+    ];
     return () => {
       window.clearInterval(id);
-      unlisten.then((f) => f());
+      for (const stop of stops) stop.then((f) => f());
     };
   }, [refreshCurrentUser]);
 
@@ -53,14 +54,6 @@ export function useProfile() {
     });
   }, []);
 
-  const handleToggleFullscreen = useCallback((enabled: boolean) => {
-    setFullscreenEnabled(enabled);
-    profileApi.setFullscreenEnabled(enabled).catch((err) => {
-      console.error(err);
-      setFullscreenEnabled(!enabled);
-    });
-  }, []);
-
   const handleToggleDucking = useCallback((enabled: boolean) => {
     setDucking((prev) => ({ ...prev, enabled }));
     profileApi.setDuckingConfig(enabled).catch((err) => {
@@ -74,10 +67,8 @@ export function useProfile() {
     ducking,
     handleToggleDucking,
     autostartEnabled,
-    fullscreenEnabled,
     currentUser,
     handleToggleProfileSync,
     handleToggleAutostart,
-    handleToggleFullscreen,
   };
 }

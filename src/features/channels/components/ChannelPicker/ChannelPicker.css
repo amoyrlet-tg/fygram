@@ -2,7 +2,6 @@
   display: flex;
   gap: 8px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
 }
 .channel-picker-manual input {
   flex: 1;
@@ -15,8 +14,6 @@
 }
 
 @media (max-width: 720px) {
-  /* Side by side the field is left with about half of a phone's width, which is
-     not enough for the placeholder to say what belongs in it. */
   .channel-picker-manual {
     flex-direction: column;
     align-items: stretch;

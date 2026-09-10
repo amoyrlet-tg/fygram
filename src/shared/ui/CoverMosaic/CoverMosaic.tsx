@@ -3,7 +3,6 @@ import { avatarGradientCss } from "@/shared/lib/avatarColor";
 import { useCoverTiles } from "@/features/tracks/useCoverTiles";
 import "./CoverMosaic.css";
 
-/** Four tiles, so four artworks - the same grid Spotify falls back to. */
 const TILES = 4;
 
 export function CoverMosaic({
@@ -14,13 +13,9 @@ export function CoverMosaic({
   size,
   className,
 }: {
-  /** Candidates to build a picture from, in the order they should be tried. */
   trackIds: string[];
-  /** A picture of its own. When present nothing is built. */
   cover?: string | null;
-  /** Decides the colour of the fallback wash. */
   seed: string;
-  /** Its first letter stands in when there is nothing to show. */
   label: string;
   size: number;
   className?: string;
@@ -40,9 +35,6 @@ export function CoverMosaic({
     );
   }
 
-  // Fewer than four and a grid would look like a mistake rather than a mosaic,
-  // so a single artwork is shown whole and nothing at all falls back to the
-  // letter - which is what every other placeholder in the app does.
   if (tiles.length >= TILES) {
     return (
       <div className={`${classes} is-mosaic`} style={style}>

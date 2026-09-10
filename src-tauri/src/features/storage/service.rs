@@ -1,5 +1,3 @@
-//! Moving the library to a new root without losing track of a file.
-
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
@@ -18,6 +16,46 @@ pub(crate) struct MediaRootInfo {
     pub(crate) is_default: bool,
     pub(crate) file_count: u32,
     pub(crate) total_bytes: u64,
+    pub(crate) disk_bytes: u64,
+    pub(crate) free_bytes: u64,
+}
+
+#[cfg(unix)]
+fn disk_space(path: &Path) -> (u64, u64) {
+    use std::os::unix::ffi::OsStrExt;
+    let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
+        return (0, 0);
+    };
+    let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) } != 0 {
+        return (0, 0);
+    }
+    let unit = stat.f_frsize as u64;
+    (
+        (stat.f_blocks as u64).saturating_mul(unit),
+        (stat.f_bavail as u64).saturating_mul(unit),
+    )
+}
+
+#[cfg(windows)]
+fn disk_space(path: &Path) -> (u64, u64) {
+    use windows::core::HSTRING;
+    use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+
+    let wide = HSTRING::from(path.as_os_str());
+    let mut total: u64 = 0;
+    let mut free: u64 = 0;
+    let ok = unsafe { GetDiskFreeSpaceExW(&wide, Some(&mut free), Some(&mut total), None) };
+    if ok.is_ok() {
+        (total, free)
+    } else {
+        (0, 0)
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
+fn disk_space(_path: &Path) -> (u64, u64) {
+    (0, 0)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -53,11 +91,14 @@ pub(crate) async fn info(
         }
     }
 
+    let (disk_bytes, free_bytes) = disk_space(&root);
     Ok(MediaRootInfo {
         path: root.to_string_lossy().to_string(),
         is_default: root == default,
         file_count,
         total_bytes,
+        disk_bytes,
+        free_bytes,
     })
 }
 

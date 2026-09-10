@@ -1,5 +1,3 @@
-//! The Windows probe: the same question, asked of the system audio sessions.
-
 use windows::core::Interface;
 use windows::Win32::Foundation::{CloseHandle, S_OK};
 use windows::Win32::Media::Audio::Endpoints::IAudioMeterInformation;
@@ -55,8 +53,6 @@ unsafe fn scan() -> windows::core::Result<bool> {
         let Ok(control) = session.cast::<IAudioSessionControl2>() else {
             continue;
         };
-        // S_OK means this *is* the system sounds session, S_FALSE that it is not.
-        // Both are success codes, so is_ok() here would skip every session there is.
         if control.IsSystemSoundsSession() == S_OK {
             continue;
         }

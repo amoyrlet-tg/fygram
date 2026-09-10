@@ -1,6 +1,3 @@
-//! Deciding who an artist is by asking the rest of the library: one tag alone
-//! is guesswork, a name repeated across many is not.
-
 use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;

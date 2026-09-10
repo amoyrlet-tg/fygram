@@ -2,12 +2,6 @@ import { useEffect, useReducer } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { LruMap } from "@/shared/lib/lruCache";
 import { tracksApi } from "./api";
-/**
- * Artwork for mosaics: many tracks per request, no palettes. A sidebar asks
- * about hundreds at once, and `useTrackCover` would decode every one of them.
- * Capped so browsing many playlists/channels over a long session does not
- * keep every tile's decoded image alive forever.
- */
 const TILES_LIMIT = 500;
 const tiles = new LruMap<string, string | null>(TILES_LIMIT);
 const watchers = new Set<() => void>();
@@ -18,7 +12,6 @@ function flush() {
   const ids = Array.from(pending);
   pending.clear();
   if (ids.length === 0) return;
-  // claimed before the answer arrives, so a second mosaic does not re-queue
   for (const id of ids) tiles.set(id, null);
   tracksApi
     .trackCoverPaths(ids)
@@ -41,9 +34,8 @@ function request(ids: string[]) {
   scheduled = true;
   queueMicrotask(flush);
 }
-/** The artwork of those of `trackIds` that have any, in the order given. */
-export function useCoverTiles(trackIds: string[]): string[] {
-  const key = trackIds.join(",");
+export function useCoverTiles(wanted: string[]): string[] {
+  const key = wanted.join(",");
   const [version, bump] = useReducer((n: number) => n + 1, 0);
   useEffect(() => {
     const ids = key ? key.split(",") : [];
@@ -59,15 +51,12 @@ export function useCoverTiles(trackIds: string[]): string[] {
       watchers.delete(read);
     };
   }, [key]);
-  // recomputed every render: memoising would mean depending on `version`,
-  // which this never reads
   void version;
   const ids = key ? key.split(",") : [];
   const seen = new Set<string>();
   const found: string[] = [];
   for (const id of ids) {
     const src = tiles.get(id);
-    // one album would otherwise be four identical squares
     if (!src || seen.has(src)) continue;
     seen.add(src);
     found.push(src);
@@ -75,5 +64,4 @@ export function useCoverTiles(trackIds: string[]): string[] {
   return found;
 }
 
-/** For the memory log: how much this module is holding on to. */
 export const tileCacheSize = () => tiles.size;

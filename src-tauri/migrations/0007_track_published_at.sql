@@ -1,1 +1,0 @@
-ALTER TABLE tracks ADD COLUMN published_at DATETIME;

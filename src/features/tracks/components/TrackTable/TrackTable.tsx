@@ -1,13 +1,4 @@
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -24,12 +15,12 @@ import {
 } from "@dnd-kit/sortable";
 import type { Channel, Playlist, Track } from "@/shared/api/types";
 import { formatRuntime, totalDurationSeconds } from "@/shared/lib/format";
-import { useAmbientColor } from "@/shared/hooks/useAmbientColor";
 import { CoverMosaic } from "@/shared/ui/CoverMosaic";
 import { usePlaylistCoverSources } from "@/features/playlists/usePlaylistCoverSources";
 import { usePlaylistCover } from "@/features/playlists/usePlaylistCover";
 import { useEnsureEditable } from "@/features/channels/useEditRights";
 import { avatarGradientCss } from "@/shared/lib/avatarColor";
+import { useScrollSpeedLimit } from "@/shared/hooks/useScrollSpeedLimit";
 import { TrackEditDialog, type TrackEdit } from "../TrackEditDialog";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
 import { useT } from "@/shared/i18n";
@@ -38,6 +29,7 @@ import {
   DownloadIcon,
   EditIcon,
   LockIcon,
+  MusicNoteIcon,
   PauseIcon,
   PlayIcon,
   RefreshIcon,
@@ -45,11 +37,10 @@ import {
   StopIcon,
   TrashIcon,
 } from "@/shared/ui/icons";
-import { SearchBox } from "../SearchBox";
 import { PlainTrackRow, SortableTrackRow } from "../TrackRow";
 import "./TrackTable.css";
 
-const ROW_HEIGHT = 52;
+const ROW_HEIGHT = 60;
 
 const PIN_HEIGHT = 56;
 
@@ -68,6 +59,8 @@ export const TrackTable = memo(function TrackTable({
   onDeletePlaylist,
   onDownloadPlaylist,
   onSyncChannel,
+  onRenameChannel,
+  onChangeChannelPhoto,
   onDownloadChannel,
   onDeleteChannel,
   onCancelSync,
@@ -80,12 +73,11 @@ export const TrackTable = memo(function TrackTable({
   onAddToPlaylist,
   onRemoveFromPlaylist,
   onUpdateTrack,
-  searchQuery,
-  onSearchChange,
   reorderable,
   onReorder,
   compact,
   unavailableIds,
+  kindLabel,
 }: {
   title: string;
   tracks: Track[];
@@ -98,10 +90,11 @@ export const TrackTable = memo(function TrackTable({
   onDeletePlaylist?: (playlistId: string) => void;
   onDownloadPlaylist?: (playlistId: string) => void;
   onSyncChannel?: (channelId: string) => void;
+  onRenameChannel?: (channelId: string, title: string) => void;
+  onChangeChannelPhoto?: (channelId: string) => void;
   onDownloadChannel?: (channelId: string) => void;
   onDeleteChannel?: (channelId: string) => void;
   onCancelSync?: (channelId: string) => void;
-  /** Whether this channel is mid-sync or mid-download, so the controls swap. */
   channelBusy?: boolean;
   trackSources?: Record<string, string[]>;
   currentTrackId: string | null;
@@ -111,8 +104,6 @@ export const TrackTable = memo(function TrackTable({
   onAddToPlaylist: (playlistId: string, trackId: string) => void;
   onRemoveFromPlaylist?: (trackId: string) => void;
   onUpdateTrack: (trackId: string, edit: TrackEdit & { album: string | null }) => Promise<boolean>;
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
 
   reorderable?: boolean;
   onReorder?: (trackId: string, newIndex: number) => void;
@@ -120,14 +111,14 @@ export const TrackTable = memo(function TrackTable({
   compact?: boolean;
 
   unavailableIds?: Set<string>;
+
+  kindLabel?: string;
 }) {
   const t = useT();
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [editing, setEditing] = useState<Track | null>(null);
   const ensureEditable = useEnsureEditable();
 
-  // the live row, not the copy the dialog opened with: a refused edit can
-  // teach the backend that the message is a forward
   const editingTrack = editing ? (tracks.find((tr) => tr.id === editing.id) ?? editing) : null;
 
   const beginEdit = useCallback(
@@ -142,6 +133,7 @@ export const TrackTable = memo(function TrackTable({
   const channelTitle = (id: string) => channelTitles.get(id) ?? "—";
 
   const scrollRef = useRef<HTMLElement>(null);
+  useScrollSpeedLimit(scrollRef);
   const scrollRafRef = useRef(0);
   const handleScroll = useCallback((event: React.UIEvent<HTMLElement>) => {
     const next = event.currentTarget.scrollTop;
@@ -158,8 +150,7 @@ export const TrackTable = memo(function TrackTable({
   const [tableTop, setTableTop] = useState(0);
 
   const total = tracks.length;
-  const hasHero = !!channelView || !!playlistView;
-  // no picture, no colour to take - untinted, like a channel with no avatar
+  const hasHero = !!channelView || !!playlistView || total > 0;
   const coverSources = usePlaylistCoverSources();
   const cover = usePlaylistCover(playlistView?.id);
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
@@ -167,15 +158,13 @@ export const TrackTable = memo(function TrackTable({
     const next = renameDraft?.trim();
     if (next && playlistView && next !== playlistView.name) {
       onRenamePlaylist?.(playlistView.id, next);
+    } else if (next && channelView && next !== channelView.title) {
+      onRenameChannel?.(channelView.id, next);
     }
     setRenameDraft(null);
   };
-  const heroTint = useAmbientColor(channelView?.avatar_path ?? playlistView?.cover_path ?? null);
-  const pinStyle = useMemo(
-    () => (heroTint ? ({ "--channel-tint": `rgb(${heroTint})` } as CSSProperties) : undefined),
-    [heroTint],
-  );
   const isEmpty = total === 0;
+  const mosaicIds = useMemo(() => tracks.slice(0, 8).map((tr) => tr.id), [tracks]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -235,12 +224,9 @@ export const TrackTable = memo(function TrackTable({
   const commitEdit = async (track: Track, edit: TrackEdit) => {
     setSavingId(track.id);
     try {
-      // telegram neither shows nor edits the album; passed through so saving
-      // cannot wipe what the file's tags hold
       const ok = await onUpdateTrack(track.id, { ...edit, album: track.album });
       if (ok) setEditing(null);
     } catch (err) {
-      // otherwise the promise rejects into nothing and the dialog just sits
       alert(`${t("Couldn't save the track:")}\n${err}`);
     } finally {
       setSavingId(null);
@@ -259,6 +245,41 @@ export const TrackTable = memo(function TrackTable({
     if (newIndex === -1) return;
     onReorder(String(active.id), newIndex);
   };
+
+  const channelFace = channelView ? (
+    channelView.avatar_path ? (
+      <UserAvatar
+        className=""
+        path={channelView.avatar_path}
+        fallback={
+          <span style={{ background: avatarGradientCss(channelView.id) }}>
+            {title.slice(0, 1).toUpperCase()}
+          </span>
+        }
+      />
+    ) : (
+      <span style={{ background: avatarGradientCss(channelView.id) }}>
+        {title.slice(0, 1).toUpperCase()}
+      </span>
+    )
+  ) : null;
+  const channelArt =
+    channelView && channelView.can_edit && onChangeChannelPhoto ? (
+      <button
+        type="button"
+        className="channel-hero-art-pick"
+        onClick={() => onChangeChannelPhoto(channelView.id)}
+        title={t("Channel picture")}
+        aria-label={t("Channel picture")}
+      >
+        {channelFace}
+        <span className="channel-hero-art-hint">
+          <EditIcon size={22} />
+        </span>
+      </button>
+    ) : (
+      channelFace
+    );
 
   const renderRow = (track: Track, i: number) => {
     const isCurrent = track.id === currentTrackId;
@@ -295,7 +316,7 @@ export const TrackTable = memo(function TrackTable({
   return (
     <section className="track-view" ref={scrollRef} onScroll={handleScroll}>
       {hasHero && (
-        <header className="channel-hero" style={pinStyle}>
+        <header className="channel-hero" data-tauri-drag-region>
           <div className="channel-hero-art">
             {playlistView ? (
               <>
@@ -313,7 +334,7 @@ export const TrackTable = memo(function TrackTable({
                     cover={playlistView.cover_path}
                     seed={playlistView.id}
                     label={title}
-                    size={148}
+                    size={192}
                   />
                   <span className="channel-hero-art-hint">
                     <EditIcon size={22} />
@@ -332,15 +353,21 @@ export const TrackTable = memo(function TrackTable({
                   </button>
                 )}
               </>
-            ) : channelView?.avatar_path ? (
-              <UserAvatar className="" path={channelView.avatar_path} />
+            ) : channelView ? (
+              channelArt
             ) : (
-              <span>{title.slice(0, 1).toUpperCase()}</span>
+              <CoverMosaic
+                className="channel-hero-mosaic"
+                trackIds={mosaicIds}
+                seed={title}
+                label={title}
+                size={192}
+              />
             )}
           </div>
           <div className="channel-hero-text">
             <span className="channel-hero-label">
-              {playlistView ? t("Playlist") : t("Channel")}
+              {kindLabel ?? (playlistView ? t("Playlist") : t("Channel"))}
             </span>
             {renameDraft === null ? (
               <h1>{title}</h1>
@@ -358,8 +385,6 @@ export const TrackTable = memo(function TrackTable({
               />
             )}
             {total > 0 && <span className="channel-hero-count">{metaLabel}</span>}
-            {/* Said before anything is clicked: an edit here would be refused,
-                and a sync is what changes that. */}
             {channelView?.can_edit === false && (
               <span
                 className="channel-hero-readonly"
@@ -369,96 +394,108 @@ export const TrackTable = memo(function TrackTable({
                 {t("Read-only")}
               </span>
             )}
-            {total > 0 && (
-              <div className="channel-hero-actions">
-                <button
-                  className="hero-play-btn"
-                  onClick={playAll}
-                  title={playingHere ? t("Pause") : t("Play")}
-                  aria-label={playingHere ? t("Pause") : t("Play")}
-                >
-                  {playingHere ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
-                </button>
-                <button
-                  className="hero-shuffle-btn"
-                  onClick={() => onPlay(tracks, Math.floor(Math.random() * tracks.length))}
-                  title={t("Shuffle")}
-                  aria-label={t("Shuffle")}
-                >
-                  <ShuffleIcon size={17} />
-                </button>
-                {channelView &&
-                  (channelBusy ? (
-                    <button
-                      className="hero-shuffle-btn"
-                      onClick={() => onCancelSync?.(channelView.id)}
-                      title={t("Stop sync")}
-                      aria-label={t("Stop sync")}
-                    >
-                      <StopIcon size={17} />
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        className="hero-shuffle-btn"
-                        onClick={() => onSyncChannel?.(channelView.id)}
-                        title={t("Sync now")}
-                        aria-label={t("Sync now")}
-                      >
-                        <RefreshIcon size={17} />
-                      </button>
-                      <button
-                        className="hero-shuffle-btn"
-                        onClick={() => onDownloadChannel?.(channelView.id)}
-                        title={t("Download all")}
-                        aria-label={t("Download all")}
-                      >
-                        <DownloadIcon size={17} />
-                      </button>
-                      <button
-                        className="hero-shuffle-btn is-danger"
-                        onClick={() => onDeleteChannel?.(channelView.id)}
-                        title={t("Delete channel")}
-                        aria-label={t("Delete channel")}
-                      >
-                        <TrashIcon size={17} />
-                      </button>
-                    </>
-                  ))}
-                {playlistView && (
-                  <>
-                    <button
-                      className="hero-shuffle-btn"
-                      onClick={() => onDownloadPlaylist?.(playlistView.id)}
-                      title={t("Download playlist")}
-                      aria-label={t("Download playlist")}
-                    >
-                      <DownloadIcon size={17} />
-                    </button>
-                    <button
-                      className="hero-shuffle-btn"
-                      onClick={() => setRenameDraft(playlistView.name)}
-                      title={t("Rename playlist")}
-                      aria-label={t("Rename playlist")}
-                    >
-                      <EditIcon size={17} />
-                    </button>
-                    <button
-                      className="hero-shuffle-btn is-danger"
-                      onClick={() => onDeletePlaylist?.(playlistView.id)}
-                      title={t("Delete playlist")}
-                      aria-label={t("Delete playlist")}
-                    >
-                      <TrashIcon size={17} />
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
           </div>
         </header>
       )}
-      <header className="track-view-header">
+      {total > 0 && (
+        <div className="channel-hero-bar">
+          <div className="channel-hero-actions">
+            <button
+              className="hero-play-btn"
+              onClick={playAll}
+              title={playingHere ? t("Pause") : t("Play")}
+              aria-label={playingHere ? t("Pause") : t("Play")}
+            >
+              {playingHere ? <PauseIcon size={22} /> : <PlayIcon size={22} />}
+            </button>
+            <button
+              className="hero-shuffle-btn"
+              onClick={() => onPlay(tracks, Math.floor(Math.random() * tracks.length))}
+              title={t("Shuffle")}
+              aria-label={t("Shuffle")}
+            >
+              <ShuffleIcon size={17} />
+            </button>
+            {channelView &&
+              (channelBusy ? (
+                <button
+                  className="hero-shuffle-btn"
+                  onClick={() => onCancelSync?.(channelView.id)}
+                  title={t("Stop sync")}
+                  aria-label={t("Stop sync")}
+                >
+                  <StopIcon size={17} />
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="hero-shuffle-btn"
+                    onClick={() => onSyncChannel?.(channelView.id)}
+                    title={t("Sync now")}
+                    aria-label={t("Sync now")}
+                  >
+                    <RefreshIcon size={17} />
+                  </button>
+                  <button
+                    className="hero-shuffle-btn"
+                    onClick={() => onDownloadChannel?.(channelView.id)}
+                    title={t("Download all")}
+                    aria-label={t("Download all")}
+                  >
+                    <DownloadIcon size={17} />
+                  </button>
+                  {channelView.can_edit && (
+                    <button
+                      className="hero-shuffle-btn"
+                      onClick={() => setRenameDraft(channelView.title)}
+                      title={t("Rename channel")}
+                      aria-label={t("Rename channel")}
+                    >
+                      <EditIcon size={17} />
+                    </button>
+                  )}
+                  <button
+                    className="hero-shuffle-btn is-danger"
+                    onClick={() => onDeleteChannel?.(channelView.id)}
+                    title={t("Delete channel")}
+                    aria-label={t("Delete channel")}
+                  >
+                    <TrashIcon size={17} />
+                  </button>
+                </>
+              ))}
+            {playlistView && (
+              <>
+                <button
+                  className="hero-shuffle-btn"
+                  onClick={() => onDownloadPlaylist?.(playlistView.id)}
+                  title={t("Download playlist")}
+                  aria-label={t("Download playlist")}
+                >
+                  <DownloadIcon size={17} />
+                </button>
+                <button
+                  className="hero-shuffle-btn"
+                  onClick={() => setRenameDraft(playlistView.name)}
+                  title={t("Rename playlist")}
+                  aria-label={t("Rename playlist")}
+                >
+                  <EditIcon size={17} />
+                </button>
+                <button
+                  className="hero-shuffle-btn is-danger"
+                  onClick={() => onDeletePlaylist?.(playlistView.id)}
+                  title={t("Delete playlist")}
+                  aria-label={t("Delete playlist")}
+                >
+                  <TrashIcon size={17} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      <header className="track-view-header" data-tauri-drag-region>
         {!hasHero && (
           <div className="track-view-heading">
             {renameDraft === null ? (
@@ -479,17 +516,19 @@ export const TrackTable = memo(function TrackTable({
             {total > 0 && <span className="track-view-count">{metaLabel}</span>}
           </div>
         )}
-        <div className="track-view-controls">
-          <SearchBox value={searchQuery} onChange={onSearchChange} />
-        </div>
       </header>
 
       {!isEmpty && (
-        <div
-          className={`track-view-pin${pinned ? " is-pinned" : ""}`}
-          style={pinStyle}
-          aria-hidden={!pinned}
-        >
+        <div className={`track-view-pin${pinned ? " is-pinned" : ""}`} aria-hidden={!pinned}>
+          <button
+            className="track-view-pin-play"
+            onClick={playAll}
+            title={playingHere ? t("Pause") : t("Play")}
+            aria-label={playingHere ? t("Pause") : t("Play")}
+            tabIndex={pinned ? 0 : -1}
+          >
+            {playingHere ? <PauseIcon size={15} /> : <PlayIcon size={15} />}
+          </button>
           <button
             className="track-view-pin-lead"
             onClick={scrollToTop}
@@ -508,7 +547,15 @@ export const TrackTable = memo(function TrackTable({
                   size={34}
                 />
               ) : channelView?.avatar_path ? (
-                <UserAvatar className="" path={channelView.avatar_path} />
+                <UserAvatar
+                  className=""
+                  path={channelView.avatar_path}
+                  fallback={
+                    <span style={{ background: avatarGradientCss(title) }}>
+                      {title.slice(0, 1).toUpperCase()}
+                    </span>
+                  }
+                />
               ) : (
                 <span style={{ background: avatarGradientCss(title) }}>
                   {title.slice(0, 1).toUpperCase()}
@@ -520,21 +567,15 @@ export const TrackTable = memo(function TrackTable({
               {metaLabel && <span className="track-view-pin-meta truncate">{metaLabel}</span>}
             </span>
           </button>
-          <button
-            className="track-view-pin-play"
-            onClick={playAll}
-            title={playingHere ? t("Pause") : t("Play")}
-            aria-label={playingHere ? t("Pause") : t("Play")}
-            tabIndex={pinned ? 0 : -1}
-          >
-            {playingHere ? <PauseIcon size={15} /> : <PlayIcon size={15} />}
-          </button>
         </div>
       )}
 
       {tracks.length === 0 ? (
         <div className="empty-state">
-          <p>{t("Nothing here yet.")}</p>
+          <span className="empty-state-art" aria-hidden>
+            <MusicNoteIcon size={30} />
+          </span>
+          <p className="empty-state-title">{t("Nothing here yet.")}</p>
         </div>
       ) : (
         <div className="track-table-scroll" ref={tableWrapRef}>
@@ -544,15 +585,17 @@ export const TrackTable = memo(function TrackTable({
               {!compact && <col className="col-num" />}
               <col className="col-index" />
               <col />
+              {!compact && <col className="col-added" />}
               <col className="col-duration" />
               <col className="col-actions" />
             </colgroup>
             <thead>
               <tr>
                 {reorderable && <th className="col-drag" />}
-                {!compact && <th className="col-num" />}
+                {!compact && <th className="col-num">#</th>}
                 <th className="col-index" />
                 <th>{t("Title")}</th>
+                {!compact && <th className="col-added">{t("Added")}</th>}
                 <th className="col-duration">{t("Duration")}</th>
                 <th className="col-actions" />
               </tr>
@@ -561,7 +604,7 @@ export const TrackTable = memo(function TrackTable({
               {topSpacerHeight > 0 && (
                 <tr aria-hidden style={{ height: topSpacerHeight }}>
                   <td
-                    colSpan={(compact ? 4 : 5) + (reorderable ? 1 : 0)}
+                    colSpan={4 + (compact ? 0 : 2) + (reorderable ? 1 : 0)}
                     style={{ padding: 0, border: "none" }}
                   />
                 </tr>
@@ -585,7 +628,7 @@ export const TrackTable = memo(function TrackTable({
               {bottomSpacerHeight > 0 && (
                 <tr aria-hidden style={{ height: bottomSpacerHeight }}>
                   <td
-                    colSpan={(compact ? 4 : 5) + (reorderable ? 1 : 0)}
+                    colSpan={4 + (compact ? 0 : 2) + (reorderable ? 1 : 0)}
                     style={{ padding: 0, border: "none" }}
                   />
                 </tr>

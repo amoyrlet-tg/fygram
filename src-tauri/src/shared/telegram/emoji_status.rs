@@ -1,5 +1,3 @@
-//! The animated emoji a user can wear next to their name.
-
 use std::io::Read;
 use std::path::Path;
 
@@ -20,6 +18,35 @@ pub(crate) enum EmojiStatusKind {
 pub(crate) struct EmojiStatus {
     pub(crate) path: String,
     pub(crate) kind: EmojiStatusKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct Collectible {
+    pub(crate) pattern_document_id: i64,
+    pub(crate) center: String,
+    pub(crate) edge: String,
+    pub(crate) pattern: String,
+    pub(crate) text: String,
+}
+
+pub(crate) fn collectible(user: &tl::enums::User) -> Option<Collectible> {
+    let tl::enums::User::User(user) = user else {
+        return None;
+    };
+    match user.emoji_status.as_ref()? {
+        tl::enums::EmojiStatus::Collectible(status) => Some(Collectible {
+            pattern_document_id: status.pattern_document_id,
+            center: hex(status.center_color),
+            edge: hex(status.edge_color),
+            pattern: hex(status.pattern_color),
+            text: hex(status.text_color),
+        }),
+        _ => None,
+    }
+}
+
+fn hex(colour: i32) -> String {
+    format!("#{:06x}", colour & 0x00ff_ffff)
 }
 
 pub(crate) fn status_document_id(user: &tl::enums::User) -> Option<i64> {

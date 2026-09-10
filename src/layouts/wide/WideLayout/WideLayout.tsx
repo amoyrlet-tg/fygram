@@ -8,22 +8,29 @@ import "./WideLayout.css";
 export type WideLayoutProps = SidebarProps & {
   trackTable: ReactNode;
   modals: ReactNode;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 };
 
-export function WideLayout({ trackTable, modals, ...sidebar }: WideLayoutProps) {
+export function WideLayout({
+  trackTable,
+  modals,
+  searchQuery,
+  onSearchChange,
+  ...sidebar
+}: WideLayoutProps) {
   const player = usePlayerApi();
   const [nowPlayingOpen, setNowPlayingOpen] = useState(false);
   const current = player.current;
 
-  // nothing to show a page about once playback stops
   useEffect(() => {
     if (!current) setNowPlayingOpen(false);
   }, [current]);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-tauri-drag-region>
       <div className="app-body">
-        <Sidebar {...sidebar} />
+        <Sidebar {...sidebar} searchQuery={searchQuery} onSearchChange={onSearchChange} />
 
         <main className="app-main">{trackTable}</main>
 

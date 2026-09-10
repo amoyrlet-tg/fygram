@@ -1,6 +1,3 @@
-//! Getting a track's bytes onto disk: the batch above, one track below. The
-//! wire itself is `transport`.
-
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -233,7 +230,6 @@ async fn download_track_locked(
         transport::download_with_retries(&client, &document, &tmp_path, &mut on_progress)
             .await
             .context("downloading audio")?;
-        // a file that vanished keeps the path the library already knows
         store_audio(&tmp_path, Path::new(&track.file_path)).await?;
         return Ok(track.file_path.clone());
     }
@@ -280,8 +276,6 @@ async fn download_track_locked(
     Ok(final_path)
 }
 
-/// Sniffed from the first bytes: the mime Telegram attaches is routinely wrong
-/// on forwarded files. Cosmetic - playback opens files by content, not name.
 fn extension_from_head(head: &[u8]) -> &'static str {
     if head.len() < 12 {
         return "bin";
@@ -290,8 +284,6 @@ fn extension_from_head(head: &[u8]) -> &'static str {
         return "mp3";
     }
     if head[0] == 0xFF && head[1] & 0xE0 == 0xE0 {
-        // mp3 and adts aac share the sync word; layer bits 00 are reserved in
-        // mpeg audio, so they mean aac
         return if head[1] & 0x06 == 0 { "aac" } else { "mp3" };
     }
     if head.starts_with(b"fLaC") {
@@ -330,8 +322,6 @@ async fn sniff_extension(path: &Path) -> &'static str {
     extension_from_head(&buffer[..read])
 }
 
-/// Untouched: the player decodes every container through ffmpeg, so the bytes
-/// Telegram served are the bytes kept.
 async fn store_audio(src: &Path, dst: &Path) -> Result<()> {
     if tokio::fs::rename(src, dst).await.is_ok() {
         return Ok(());
@@ -359,7 +349,6 @@ async fn sha256_file(path: &Path) -> Result<String> {
 mod tests {
     use super::*;
 
-    // first bytes of files ffmpeg actually produced, not what the specs say
     const MP3: &[u8] = &[
         0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x54, 0x53, 0x53, 0x45, 0x00,
         0x00, 0x00, 0x0f, 0x00, 0x00, 0x03, 0x4c, 0x61, 0x76, 0x66, 0x36, 0x32, 0x2e, 0x31, 0x32,
@@ -409,8 +398,6 @@ mod tests {
 
     #[test]
     fn adts_aac_is_not_mistaken_for_mp3() {
-        // an mp3 with no id3 tag: eleven sync bits shared with aac above, and
-        // only the layer bits tell them apart
         let mpeg_frame = [0xFF, 0xFB, 0x90, 0x00, 0, 0, 0, 0, 0, 0, 0, 0];
         assert_eq!(AAC[0], mpeg_frame[0]);
         assert_eq!(AAC[1] & 0xE0, mpeg_frame[1] & 0xE0);

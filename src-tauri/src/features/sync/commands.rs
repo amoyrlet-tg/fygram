@@ -1,5 +1,3 @@
-//! The IPC surface of sync: the status the UI shows, and the button that says now.
-
 use tauri::State;
 
 use crate::AppState;

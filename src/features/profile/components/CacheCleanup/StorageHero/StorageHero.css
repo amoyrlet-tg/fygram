@@ -1,0 +1,100 @@
+.storage-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0 var(--spacing-tighter);
+}
+
+.storage-total {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.storage-total-value {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.storage-total-unit {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.storage-hero-meta {
+  margin: 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.storage-disk {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.storage-disk-bar {
+  display: flex;
+  width: min(240px, 100%);
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.storage-disk-part {
+  height: 100%;
+}
+.storage-disk-part.is-app {
+  min-width: 3px;
+  background: var(--blue);
+}
+.storage-disk-part.is-other {
+  background: var(--text-faint);
+  opacity: 0.45;
+}
+
+.storage-disk-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.storage-disk-legend li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.storage-disk-legend b {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.storage-disk-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.storage-disk-dot.is-app {
+  background: var(--blue);
+}
+.storage-disk-dot.is-other {
+  background: color-mix(in srgb, var(--text-faint) 45%, transparent);
+}
+.storage-disk-dot.is-free {
+  background: var(--bg-hover);
+}

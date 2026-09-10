@@ -29,25 +29,19 @@
   gap: 10px;
   padding: 22px 16px;
   background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-lg);
   color: var(--text);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition:
-    border-color var(--duration-short) ease,
-    background var(--duration-short) ease,
-    transform var(--duration-short) ease;
 }
 .language-picker-option:hover {
-  border-color: var(--accent);
   background: var(--bg-hover);
-  transform: translateY(-2px);
 }
 
 .language-picker-option.is-suggested {
-  border-color: var(--accent-base, var(--blue));
+  background: color-mix(in srgb, var(--accent-base) 16%, var(--bg-elevated-2));
 }
 
 .language-picker-flag {
@@ -55,7 +49,6 @@
   height: 30px;
   object-fit: cover;
   border-radius: 4px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 @media (max-width: 420px) {

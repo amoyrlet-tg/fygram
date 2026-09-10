@@ -1,52 +1,70 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import duckclean from "@/assets/duckclean.tgs";
-import type { CachePlan, CachePreview, Channel, MediaRootInfo, Playlist } from "@/shared/api/types";
+import type {
+  CachePlan,
+  CachePreview,
+  Channel,
+  MediaRootInfo,
+  Playlist,
+  Track,
+} from "@/shared/api/types";
 import { channelsApi } from "@/features/channels/api";
 import { playlistsApi } from "@/features/playlists/api";
 import { storageApi } from "@/features/storage/api";
+import { tracksApi } from "@/features/tracks/api";
+import { useArtists } from "@/features/artists/useArtists";
+import { VARIOUS_ARTISTS_KEY } from "@/shared/lib/artists";
+import { avatarGradientCss } from "@/shared/lib/avatarColor";
+import { formatSize } from "@/shared/lib/format";
+import { fuzzyTextMatches } from "@/shared/lib/fuzzy";
+import { SearchBox } from "@/features/tracks/components/SearchBox";
 import { useT } from "@/shared/i18n";
-import { useModalClose } from "@/shared/hooks/useModalClose";
-import { useIsDesktopHost } from "@/platforms/host";
 import { Lottie } from "@/shared/ui/Lottie";
 import { CheckIcon, PlaylistIcon } from "@/shared/ui/icons";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
 import { initials } from "@/shared/lib/initials";
 import { showToast } from "@/shared/ui/Toast";
+import { StorageHero } from "./StorageHero";
 import "./CacheCleanup.css";
-
-function formatBytes(t: (key: string) => string, bytes: number): string {
-  if (bytes <= 0) return `0 ${t("MB")}`;
-  const mb = bytes / (1024 * 1024);
-  if (mb < 1024) return `${mb.toFixed(0)} ${t("MB")}`;
-  return `${(mb / 1024).toFixed(2)} ${t("GB")}`;
-}
 
 type Busy = null | "cleaning" | "moving";
 
-export function CacheCleanup({ onClose }: { onClose: () => void }) {
+export function CacheCleanup() {
   const t = useT();
-  const { closing, requestClose } = useModalClose(onClose);
-  const isDesktop = useIsDesktopHost();
 
   const [root, setRoot] = useState<MediaRootInfo | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [playlistTracks, setPlaylistTracks] = useState<Record<string, Track[]>>({});
+  const [sizes, setSizes] = useState<Record<string, number>>({});
   const [keepPlaylists, setKeepPlaylists] = useState<Set<string>>(new Set());
   const [keepChannels, setKeepChannels] = useState<Set<string>>(new Set());
+  const [keepArtists, setKeepArtists] = useState<Set<string>>(new Set());
   const [dropOrphans, setDropOrphans] = useState(true);
   const [preview, setPreview] = useState<CachePreview | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const { artists, tracksByArtist } = useArtists(tracks, null);
+  const keepTrackIds = useMemo(() => {
+    if (keepArtists.size === 0) return [];
+    const ids = new Set<string>();
+    for (const artist of keepArtists) {
+      for (const track of tracksByArtist.get(artist) ?? []) ids.add(track.id);
+    }
+    return [...ids];
+  }, [keepArtists, tracksByArtist]);
+
   const plan = useMemo<CachePlan>(
     () => ({
       keep_playlist_ids: [...keepPlaylists],
       keep_channel_ids: [...keepChannels],
+      keep_track_ids: keepTrackIds,
       drop_orphans: dropOrphans,
     }),
-    [keepPlaylists, keepChannels, dropOrphans],
+    [keepPlaylists, keepChannels, keepTrackIds, dropOrphans],
   );
 
   const refresh = useCallback(() => {
@@ -54,12 +72,25 @@ export function CacheCleanup({ onClose }: { onClose: () => void }) {
       .getMediaRoot()
       .then(setRoot)
       .catch((err) => setError(String(err)));
+    storageApi.fileSizes().then(setSizes).catch(console.error);
   }, []);
 
   useEffect(() => {
     refresh();
-    playlistsApi.listPlaylists().then(setPlaylists).catch(console.error);
     channelsApi.listChannels().then(setChannels).catch(console.error);
+    tracksApi.listTracks().then(setTracks).catch(console.error);
+    playlistsApi
+      .listPlaylists()
+      .then(async (list) => {
+        setPlaylists(list);
+        const pairs = await Promise.all(
+          list.map(
+            async (p) => [p.id, await playlistsApi.listPlaylistTracks(p.id)] as [string, Track[]],
+          ),
+        );
+        setPlaylistTracks(Object.fromEntries(pairs));
+      })
+      .catch(console.error);
   }, [refresh]);
 
   useEffect(() => {
@@ -83,6 +114,42 @@ export function CacheCleanup({ onClose }: { onClose: () => void }) {
     else next.add(id);
     return next;
   };
+  const withAll = (set: Set<string>, ids: string[]) => new Set([...set, ...ids]);
+  const without = (set: Set<string>, ids: string[]) => {
+    const next = new Set(set);
+    for (const id of ids) next.delete(id);
+    return next;
+  };
+
+  const weigh = useCallback(
+    (list: Track[]) => {
+      let bytes = 0;
+      const seen = new Set<string>();
+      for (const track of list) {
+        if (!track.file_path || seen.has(track.file_path)) continue;
+        seen.add(track.file_path);
+        bytes += sizes[track.file_path] ?? 0;
+      }
+      return bytes;
+    },
+    [sizes],
+  );
+
+  const downloaded = useCallback(
+    (list: Track[]) =>
+      list.some((track) => !!track.file_path && sizes[track.file_path] !== undefined),
+    [sizes],
+  );
+
+  const tracksByChannel = useMemo(() => {
+    const map = new Map<string, Track[]>();
+    for (const track of tracks) {
+      const list = map.get(track.channel_id);
+      if (list) list.push(track);
+      else map.set(track.channel_id, [track]);
+    }
+    return map;
+  }, [tracks]);
 
   const chooseFolder = async () => {
     const picked = await open({
@@ -116,7 +183,7 @@ export function CacheCleanup({ onClose }: { onClose: () => void }) {
       showToast({
         key: "cache-clean",
         kind: "ok",
-        message: t("Freed {size}.").replace("{size}", formatBytes(t, res.freed_bytes)),
+        message: t("Freed {size}.").replace("{size}", formatSize(res.freed_bytes, t)),
       });
       refresh();
     } catch (err) {
@@ -126,166 +193,227 @@ export function CacheCleanup({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const nothingToDo =
-    !preview || preview.free_bytes + (dropOrphans ? preview.orphan_bytes : 0) === 0;
+  const playlistItems = useMemo<KeepItem[]>(
+    () =>
+      playlists
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          bytes: weigh(playlistTracks[p.id] ?? []),
+          art: <PlaylistIcon size={14} />,
+        }))
+        .sort((a, b) => b.bytes - a.bytes),
+    [playlists, playlistTracks, weigh],
+  );
 
-  return createPortal(
-    <div className={`modal-backdrop${closing ? " is-closing" : ""}`} onClick={requestClose}>
-      <div
-        className={`modal storage-modal${closing ? " is-closing" : ""}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-header">
-          <h2>{t("Storage")}</h2>
-          <button className="icon-btn" onClick={requestClose} aria-label={t("Close")}>
-            ×
-          </button>
-        </div>
-
-        <div className="modal-body">
-          {busy ? (
-            <div className="storage-working">
-              <Lottie animationData={duckclean} size={140} />
-              <span>{busy === "cleaning" ? t("Clearing…") : t("Moving files…")}</span>
-            </div>
+  const channelItems = useMemo<KeepItem[]>(
+    () =>
+      channels
+        .map((c) => ({
+          id: c.id,
+          name: c.title,
+          bytes: weigh(tracksByChannel.get(c.id) ?? []),
+          art: c.avatar_path ? (
+            <UserAvatar
+              className="keep-row-avatar"
+              path={c.avatar_path}
+              fallback={
+                <span className="keep-row-avatar keep-row-avatar-fallback">
+                  {initials(c.title)}
+                </span>
+              }
+            />
           ) : (
-            <>
-              <section className="storage-section">
-                <div className="storage-section-title">{t("Where music is kept")}</div>
-                <div className="storage-path" title={root?.path}>
-                  {root?.path ?? "…"}
-                </div>
-                <div className="muted">
-                  {root
-                    ? `${root.file_count} ${t("files")} · ${formatBytes(t, root.total_bytes)}`
-                    : t("Loading cache size…")}
-                </div>
-                {/* Android has no directory picker, and no second place to put
-                    a library either - the app's own storage is all there is. */}
-                {isDesktop && (
-                  <div className="storage-actions">
-                    <button className="btn" onClick={chooseFolder}>
-                      {t("Choose folder…")}
-                    </button>
-                  </div>
-                )}
-              </section>
+            <span className="keep-row-avatar keep-row-avatar-fallback">{initials(c.title)}</span>
+          ),
+        }))
+        .sort((a, b) => b.bytes - a.bytes),
+    [channels, tracksByChannel, weigh],
+  );
 
-              <section className="storage-section">
-                <div className="storage-section-title">{t("Keep the audio for")}</div>
-                <div className="storage-keep-grid">
-                  <KeepColumn
-                    label={t("Playlists")}
-                    empty={t("No playlists yet.")}
-                    allLabel={t("All")}
-                    noneLabel={t("None")}
-                    items={playlists.map((p) => ({
-                      id: p.id,
-                      name: p.name,
-                      art: <PlaylistIcon size={14} />,
-                    }))}
-                    selected={keepPlaylists}
-                    onToggle={(id) => setKeepPlaylists((prev) => toggle(prev, id))}
-                    onAll={() => setKeepPlaylists(new Set(playlists.map((p) => p.id)))}
-                    onNone={() => setKeepPlaylists(new Set())}
-                  />
-                  <KeepColumn
-                    label={t("Channels")}
-                    empty={t("No channels yet.")}
-                    allLabel={t("All")}
-                    noneLabel={t("None")}
-                    items={channels.map((c) => ({
-                      id: c.id,
-                      name: c.title,
-                      art: c.avatar_path ? (
-                        <UserAvatar className="keep-row-avatar" path={c.avatar_path} />
-                      ) : (
-                        <span className="keep-row-avatar keep-row-avatar-fallback">
-                          {initials(c.title)}
-                        </span>
-                      ),
-                    }))}
-                    selected={keepChannels}
-                    onToggle={(id) => setKeepChannels((prev) => toggle(prev, id))}
-                    onAll={() => setKeepChannels(new Set(channels.map((c) => c.id)))}
-                    onNone={() => setKeepChannels(new Set())}
-                  />
-                </div>
+  const artistItems = useMemo<KeepItem[]>(
+    () =>
+      artists
+        .filter((a) => a.name !== VARIOUS_ARTISTS_KEY)
+        .filter((a) => downloaded(tracksByArtist.get(a.name) ?? []))
+        .map((a) => ({
+          id: a.name,
+          name: a.name,
+          bytes: weigh(tracksByArtist.get(a.name) ?? []),
+          art: (
+            <span
+              className="keep-row-avatar keep-row-avatar-fallback keep-row-letter"
+              style={{ background: avatarGradientCss(a.name) }}
+            >
+              {initials(a.name)}
+            </span>
+          ),
+        }))
+        .sort((a, b) => b.bytes - a.bytes),
+    [artists, tracksByArtist, weigh, downloaded],
+  );
 
-                <button
-                  type="button"
-                  className={`keep-row storage-orphans${dropOrphans ? " is-on" : ""}`}
-                  onClick={() => setDropOrphans((v) => !v)}
-                >
-                  <span className="keep-row-name">
-                    {t("Also delete files that belong to no track")}
-                  </span>
-                  <span className="keep-row-check">{dropOrphans && <CheckIcon size={13} />}</span>
-                </button>
-              </section>
+  const freeing = preview ? preview.free_bytes + (dropOrphans ? preview.orphan_bytes : 0) : 0;
+  const nothingToDo = !preview || freeing === 0;
 
-              {preview && (
-                <div className="storage-preview">
-                  <div className="storage-preview-headline">
-                    <strong>{formatBytes(t, preview.free_bytes)}</strong> {t("will be freed")} ·{" "}
-                    {preview.free_tracks} {t("songs")}
-                  </div>
-                  <div className="muted">
-                    {t("Staying")}: {formatBytes(t, preview.keep_bytes)} · {preview.keep_tracks}{" "}
-                    {t("songs")}
-                  </div>
-                  {dropOrphans && preview.orphan_files > 0 && (
-                    <div className="muted">
-                      {t("Leftover files")}: {preview.orphan_files} ·{" "}
-                      {formatBytes(t, preview.orphan_bytes)}
-                    </div>
-                  )}
-                </div>
-              )}
+  return (
+    <div className="settings-body storage-page">
+      {busy ? (
+        <div className="storage-working">
+          <Lottie animationData={duckclean} size={140} />
+          <span>{busy === "cleaning" ? t("Clearing…") : t("Moving files…")}</span>
+        </div>
+      ) : (
+        <>
+          <StorageHero root={root} />
 
-              <p className="muted">
-                {t(
-                  "Songs stay in your playlists — only the audio goes, and it downloads again the next time you play it.",
-                )}
-              </p>
-            </>
+          <div className="storage-path-row">
+            <span className="storage-path-text truncate" title={root?.path}>
+              {root?.path ?? "…"}
+            </span>
+            <button type="button" className="storage-path-action" onClick={chooseFolder}>
+              {t("Choose folder…")}
+            </button>
+          </div>
+
+          <section className="storage-section">
+            <div className="storage-section-title">{t("Keep the audio for")}</div>
+            <div className="storage-keep-stack">
+              <KeepColumn
+                label={t("Playlists")}
+                empty={t("No playlists yet.")}
+                searchPlaceholder={t("Search playlists…")}
+                items={playlistItems}
+                selected={keepPlaylists}
+                format={(bytes) => formatSize(bytes, t)}
+                onToggle={(id) => setKeepPlaylists((prev) => toggle(prev, id))}
+                onAll={(ids) => setKeepPlaylists((prev) => withAll(prev, ids))}
+                onNone={(ids) => setKeepPlaylists((prev) => without(prev, ids))}
+              />
+              <KeepColumn
+                label={t("Channels")}
+                empty={t("No channels yet.")}
+                searchPlaceholder={t("Search channels…")}
+                items={channelItems}
+                selected={keepChannels}
+                format={(bytes) => formatSize(bytes, t)}
+                onToggle={(id) => setKeepChannels((prev) => toggle(prev, id))}
+                onAll={(ids) => setKeepChannels((prev) => withAll(prev, ids))}
+                onNone={(ids) => setKeepChannels((prev) => without(prev, ids))}
+              />
+              <KeepColumn
+                label={t("Artists")}
+                empty={t("No artists yet.")}
+                searchPlaceholder={t("Search artists…")}
+                items={artistItems}
+                selected={keepArtists}
+                format={(bytes) => formatSize(bytes, t)}
+                onToggle={(name) => setKeepArtists((prev) => toggle(prev, name))}
+                onAll={(ids) => setKeepArtists((prev) => withAll(prev, ids))}
+                onNone={(ids) => setKeepArtists((prev) => without(prev, ids))}
+              />
+            </div>
+
+            <button
+              type="button"
+              className={`keep-row storage-orphans${dropOrphans ? " is-on" : ""}`}
+              onClick={() => setDropOrphans((v) => !v)}
+            >
+              <span className="keep-row-name">
+                {t("Also delete files that belong to no track")}
+              </span>
+              <span className="keep-row-check">{dropOrphans && <CheckIcon size={13} />}</span>
+            </button>
+          </section>
+
+          {preview && (
+            <div className="storage-balance">
+              <div className="storage-balance-bar">
+                <span
+                  className="storage-balance-part is-keep"
+                  style={{ flexGrow: Math.max(preview.keep_bytes, 1) }}
+                />
+                <span
+                  className="storage-balance-part is-free"
+                  style={{ flexGrow: Math.max(freeing, 1) }}
+                />
+              </div>
+              <div className="storage-balance-legend">
+                <span className="storage-balance-side">
+                  <i className="storage-balance-dot is-keep" />
+                  {t("Keeping")} {formatSize(preview.keep_bytes, t)}
+                </span>
+                <span className="storage-balance-side">
+                  <i className="storage-balance-dot is-free" />
+                  {t("Freeing")} {formatSize(freeing, t)}
+                </span>
+              </div>
+            </div>
           )}
 
-          {error && <div className="auth-error">{error}</div>}
-        </div>
+          <p className="storage-note">
+            {t(
+              "Songs stay in your playlists — only the audio goes, and it downloads again the next time you play it.",
+            )}
+          </p>
+        </>
+      )}
 
-        <div className="modal-footer">
-          <button className="btn btn-primary" disabled={!!busy || nothingToDo} onClick={runCleanup}>
-            {busy === "cleaning" ? t("Clearing…") : t("Clear")}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+      {error && <div className="auth-error">{error}</div>}
+
+      <button
+        className="btn btn-primary storage-clear"
+        disabled={!!busy || nothingToDo}
+        onClick={runCleanup}
+      >
+        {busy === "cleaning" ? t("Clearing…") : t("Clear")}
+        {preview && !nothingToDo && (
+          <span className="storage-clear-size">{formatSize(freeing, t)}</span>
+        )}
+      </button>
+    </div>
   );
+}
+
+interface KeepItem {
+  id: string;
+  name: string;
+  art: React.ReactNode;
+  bytes: number;
 }
 
 function KeepColumn({
   label,
   empty,
-  allLabel,
-  noneLabel,
+  searchPlaceholder,
   items,
   selected,
+  format,
   onToggle,
   onAll,
   onNone,
 }: {
   label: string;
   empty: string;
-  allLabel: string;
-  noneLabel: string;
-  items: { id: string; name: string; art: React.ReactNode }[];
+  searchPlaceholder: string;
+  items: KeepItem[];
   selected: Set<string>;
+  format: (bytes: number) => string;
   onToggle: (id: string) => void;
-  onAll: () => void;
-  onNone: () => void;
+  onAll: (ids: string[]) => void;
+  onNone: (ids: string[]) => void;
 }) {
+  const t = useT();
+  const [query, setQuery] = useState("");
+  const searchable = items.length > 4;
+
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => fuzzyTextMatches(item.name.toLowerCase(), q));
+  }, [items, query]);
+  const shownIds = shown.map((item) => item.id);
+
   return (
     <div className="storage-keep-column">
       <div className="storage-keep-head">
@@ -295,18 +423,32 @@ function KeepColumn({
         </span>
         {items.length > 0 && (
           <span className="storage-keep-bulk">
-            <button type="button" onClick={onAll}>
-              {allLabel}
+            <button type="button" onClick={() => onAll(shownIds)}>
+              {t("All")}
             </button>
-            <button type="button" onClick={onNone}>
-              {noneLabel}
+            <button type="button" onClick={() => onNone(shownIds)}>
+              {t("None")}
             </button>
           </span>
         )}
       </div>
+
+      {searchable && (
+        <SearchBox
+          className="keep-search"
+          value={query}
+          onChange={setQuery}
+          placeholder={searchPlaceholder}
+          iconSize={15}
+        />
+      )}
+
       <div className="storage-keep-list">
         {items.length === 0 && <div className="empty-hint">{empty}</div>}
-        {items.map((item) => {
+        {items.length > 0 && shown.length === 0 && (
+          <div className="empty-hint">{t("No matches.")}</div>
+        )}
+        {shown.map((item) => {
           const on = selected.has(item.id);
           return (
             <button
@@ -315,9 +457,11 @@ function KeepColumn({
               className={`keep-row${on ? " is-on" : ""}`}
               onClick={() => onToggle(item.id)}
               aria-pressed={on}
+              title={item.name}
             >
               <span className="keep-row-art">{item.art}</span>
               <span className="keep-row-name truncate">{item.name}</span>
+              {item.bytes > 0 && <span className="keep-row-size">{format(item.bytes)}</span>}
               <span className="keep-row-check">{on && <CheckIcon size={13} />}</span>
             </button>
           );

@@ -1,42 +1,17 @@
-/* A touch smaller where the screen is a phone's or a tablet's. `zoom` rather
-   than a transform: it scales the layout itself, so nothing overflows and hit
-   areas move with what they belong to. It also leaves media queries alone, so
-   the choice between the wide and the narrow layout is made on the real width -
-   a tablet still gets the wide one.
-
-   What it does scale is viewport units, and that is a trap: `100dvh` under a
-   0.9 zoom draws nine tenths of the screen and leaves a strip of nothing at the
-   bottom. Anything that means "the whole window" asks for --app-height instead,
-   which is the same fraction the other way round. The two numbers below have to
-   stay in step. */
-:root[data-compact] {
-  zoom: 0.9;
-  --app-height: calc(100dvh / 0.9);
-  --safe-top: calc(var(--android-safe-top, env(safe-area-inset-top, 0px)) / 0.9);
-  --safe-bottom: calc(var(--android-safe-bottom, env(safe-area-inset-bottom, 0px)) / 0.9);
-}
-
 :root {
-  /* The whole window, whatever the zoom - see :root[data-compact]. */
-  --app-height: 100dvh;
+  --window-controls-height: 48px;
+  --window-controls-width: 120px;
 
-  /* How much of the top and bottom edges the system bars are standing on. The
-     activity draws edge to edge, so without these the status bar sits over the
-     first row of whatever is on screen.
+  --bg: color-mix(in srgb, var(--accent-base) 4%, #000000);
+  --bg-elevated: color-mix(in srgb, var(--accent-base) 7%, #121212);
+  --bg-elevated-2: color-mix(in srgb, var(--accent-base) 10%, #1f1f1f);
+  --bg-hover: color-mix(in srgb, var(--accent-base) 15%, #292929);
+  --border: color-mix(in srgb, var(--accent-base) 10%, #1f1f1f);
+  --border-strong: color-mix(in srgb, var(--accent-base) 16%, #333333);
 
-     Android WebView reports display cutouts through env(safe-area-inset-*) but
-     not, dependably, the status bar of an edge-to-edge window - so MainActivity
-     measures the bars itself and sets --android-safe-*. env() stays the
-     fallback, and is what every other platform uses. */
-  --safe-top: var(--android-safe-top, env(safe-area-inset-top, 0px));
-  --safe-bottom: var(--android-safe-bottom, env(safe-area-inset-bottom, 0px));
+  --divider: color-mix(in srgb, var(--accent-base) 6%, var(--bg-elevated));
 
-  --bg: #000000;
-  --bg-elevated: #121212;
-  --bg-elevated-2: #1f1f1f;
-  --bg-hover: #292929;
-  --border: #1f1f1f;
-  --border-strong: #333333;
+  --accent-ink: var(--accent-base);
 
   --text: #ffffff;
   --text-dim: #b3b3b3;
@@ -61,9 +36,6 @@
 
   --slider-track-bg: rgba(255, 255, 255, 0.24);
 
-  /* The wash behind a dialog. It darkens; it does not frost - a few pixels of
-     blur only smear the text behind into mush without reading as glass, so the
-     work is done by the scrim and the blur is barely there. */
   --scrim: rgba(0, 0, 0, 0.66);
   --scrim-blur: 2px;
 
@@ -73,19 +45,24 @@
   --glass-bg-2: var(--bg-elevated-2);
   --glass-border: var(--border);
   --glass-inset: rgba(255, 255, 255, 0.04);
-  --glass-shadow: none;
   --panel-gap: 8px;
+  --sidebar-width: 264px;
+
+  --sidebar-inset: 8px;
+
+  --content-pad: 32px;
+
+  --row-h: 56px;
+  --row-gap: 4px;
+  --art-row: 40px;
+  --art-hero: 192px;
 
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-pill: 999px;
 
-  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.45);
-  --shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.55);
-
   --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
-  --lift: translateY(-1px);
 
   --spacing-tighter-5: 2px;
   --spacing-tighter-4: 4px;
@@ -117,26 +94,25 @@
   --ease-productive: cubic-bezier(0.3, 0, 0, 1);
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
 
-  --overlay-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.3);
-
   --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
 
   color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-  --bg: #ffffff;
-  --bg-elevated: #f7f7f7;
-  --bg-elevated-2: #f0f0f0;
-  --bg-hover: #e8e8e8;
-  --border: #d9d9d9;
-  --border-strong: #a7a7a7;
+  --bg: color-mix(in srgb, var(--accent-base) 9%, #ffffff);
+  --bg-elevated: color-mix(in srgb, var(--accent-base) 5%, #ffffff);
+  --bg-elevated-2: color-mix(in srgb, var(--accent-base) 14%, #ffffff);
+  --bg-hover: color-mix(in srgb, var(--accent-base) 21%, #ffffff);
+  --border: color-mix(in srgb, var(--accent-base) 22%, #ffffff);
+  --border-strong: color-mix(in srgb, var(--accent-base) 45%, #ffffff);
+  --divider: color-mix(in srgb, var(--accent-base) 14%, var(--bg-elevated));
+  --accent-ink: color-mix(in srgb, var(--accent-base) 55%, #1a1a1a);
 
   --text: #121212;
   --text-dim: #5e5e5e;
   --text-faint: #6a6a6a;
 
-  /* less of it on a light ground, or the page reads as switched off */
   --scrim: rgba(20, 20, 22, 0.4);
 
   --accent: #121212;
@@ -163,21 +139,20 @@
   --glass-bg-2: var(--bg-elevated-2);
   --glass-border: var(--border);
   --glass-inset: rgba(0, 0, 0, 0.03);
-  --glass-shadow: none;
-
-  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.12);
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #ffffff;
-    --bg-elevated: #f7f7f7;
-    --bg-elevated-2: #f0f0f0;
-    --bg-hover: #e8e8e8;
-    --border: #d9d9d9;
-    --border-strong: #a7a7a7;
+    --bg: color-mix(in srgb, var(--accent-base) 9%, #ffffff);
+    --bg-elevated: color-mix(in srgb, var(--accent-base) 5%, #ffffff);
+    --bg-elevated-2: color-mix(in srgb, var(--accent-base) 14%, #ffffff);
+    --bg-hover: color-mix(in srgb, var(--accent-base) 21%, #ffffff);
+    --border: color-mix(in srgb, var(--accent-base) 22%, #ffffff);
+    --border-strong: color-mix(in srgb, var(--accent-base) 45%, #ffffff);
+    --divider: color-mix(in srgb, var(--accent-base) 14%, var(--bg-elevated));
+    --accent-ink: color-mix(in srgb, var(--accent-base) 55%, #1a1a1a);
 
     --text: #121212;
     --text-dim: #5e5e5e;
@@ -208,9 +183,6 @@
     --glass-bg-2: var(--bg-elevated-2);
     --glass-border: var(--border);
     --glass-inset: rgba(0, 0, 0, 0.03);
-    --glass-shadow: none;
-
-    --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.12);
 
     color-scheme: light;
   }
@@ -218,6 +190,14 @@
 
 * {
   box-sizing: border-box;
+}
+
+:root[data-switching],
+:root[data-switching] *,
+:root[data-switching] *::before,
+:root[data-switching] *::after {
+  transition: none !important;
+  animation-duration: 0s !important;
 }
 
 html,
@@ -230,10 +210,6 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-
-  transition:
-    background-color 200ms ease,
-    color 200ms ease;
   font-family:
     "Inter",
     -apple-system,
@@ -322,12 +298,15 @@ button {
 }
 
 :focus-visible {
+  outline: none;
+}
+:root[data-keyboard-nav] :focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
 
 .btn {
-  border: 1px solid transparent;
+  border: none;
   border-radius: var(--radius-pill);
   padding: 10px 20px;
   font-size: 13.5px;
@@ -336,46 +315,25 @@ button {
   align-items: center;
   gap: 8px;
   justify-content: center;
-  transition:
-    transform 0.15s var(--ease-out),
-    background 0.15s ease-out,
-    border-color 0.15s ease-out,
-    box-shadow 0.15s ease-out,
-    opacity 0.15s ease-out;
-}
-.btn:hover:not(:disabled) {
-  transform: var(--lift);
-}
-.btn:active:not(:disabled) {
-  transform: scale(0.98);
 }
 .btn:disabled {
   opacity: 0.5;
   cursor: default;
-  transform: none;
 }
 .btn-primary {
   background: var(--blue);
   color: #fff;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--blue) 32%, transparent);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--blue-hover);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--blue) 40%, transparent);
 }
 .btn-ghost {
-  background: color-mix(in srgb, var(--blue) 8%, transparent);
-  border-color: color-mix(in srgb, var(--blue) 20%, transparent);
+  background: color-mix(in srgb, var(--blue) 10%, transparent);
   color: var(--text);
-}
-.btn-ghost:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--blue) 16%, transparent);
-  border-color: color-mix(in srgb, var(--blue) 42%, transparent);
 }
 .btn-danger {
   background: var(--danger);
   color: #fff;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--danger) 30%, transparent);
 }
 .danger-ghost {
   color: var(--danger);
@@ -386,7 +344,7 @@ button {
 
 .icon-btn {
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
   color: var(--text-dim);
   width: 30px;
   height: 30px;
@@ -394,20 +352,10 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition:
-    background 0.15s ease-out,
-    border-color 0.15s ease-out,
-    color 0.15s ease-out,
-    transform 0.15s var(--ease-out);
 }
 .icon-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--blue) 12%, transparent);
-  border-color: color-mix(in srgb, var(--blue) 26%, transparent);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
   color: var(--text);
-  transform: var(--lift);
-}
-.icon-btn:active:not(:disabled) {
-  transform: scale(0.94);
 }
 .icon-btn:disabled {
   opacity: 0.35;
@@ -416,15 +364,13 @@ button {
 .icon-btn.is-on {
   color: var(--accent);
 }
-/* A locked action still answers a click - it re-checks the right - so it is
-   dimmed rather than disabled, and keeps its hover. */
+
 .icon-btn.is-locked {
   opacity: 0.5;
 }
 .icon-btn.is-locked:hover:not(:disabled) {
   opacity: 1;
   background: color-mix(in srgb, var(--accent-yellow) 14%, transparent);
-  border-color: color-mix(in srgb, var(--accent-yellow) 30%, transparent);
 }
 
 .field {
@@ -449,13 +395,6 @@ button {
     border-color 0.15s ease-out,
     box-shadow 0.15s ease-out;
 }
-.field input:focus,
-.channel-picker-manual input:focus,
-.playlist-new-input:focus {
-  border-color: color-mix(in srgb, var(--blue) 70%, transparent);
-  box-shadow: 0 0 0 3px var(--blue-soft);
-}
-
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -472,8 +411,8 @@ button {
 }
 
 .playlist-new-input {
-  margin: 0 6px 6px;
-  width: calc(100% - 12px);
+  margin: 0 0 6px;
+  width: 100%;
   padding: 7px 10px;
   font-size: 13px;
 }
@@ -516,142 +455,10 @@ button {
   transform: translateX(12px);
   background: #000;
 }
-
-.profile-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 13px;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  flex-shrink: 0;
-}
-.profile-avatar-img {
-  object-fit: cover;
-  background: var(--bg-elevated-2);
-}
-.profile-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.profile-fullname {
-  font-weight: 600;
-  font-size: 13.5px;
-}
 .profile-id {
   font-size: 11.5px;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
-}
-.profile-setting-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12.5px;
-  color: var(--text-dim);
-}
-
-.profile-id-row {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-.profile-id-row .icon-btn {
-  width: 22px;
-  height: 22px;
-}
-
-.profile-chip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px 3px 3px;
-  background: transparent;
-  border: none;
-  border-radius: var(--border-radius-rounded);
-  color: var(--text-dim);
-  transition: background var(--duration-shortest) ease;
-}
-.profile-chip:hover,
-.profile-chip.is-open {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-.profile-chip .profile-avatar {
-  width: 28px;
-  height: 28px;
-  font-size: 10px;
-}
-.profile-chip-chevron {
-  transition: transform var(--duration-short) var(--ease-productive);
-}
-.profile-chip.is-open .profile-chip-chevron {
-  transform: rotate(180deg);
-}
-
-.profile-menu-backdrop {
-  position: fixed;
-  inset: 0;
-  height: var(--app-height);
-  background: var(--scrim);
-  backdrop-filter: blur(var(--scrim-blur));
-  -webkit-backdrop-filter: blur(var(--scrim-blur));
-  z-index: 120;
-}
-.profile-menu {
-  position: fixed;
-  z-index: 121;
-  width: 460px;
-  background: var(--bg-elevated-2);
-  border: 1px solid color-mix(in srgb, var(--blue) 16%, var(--border));
-  border-radius: 22px;
-  box-shadow: var(--overlay-shadow), var(--shadow-panel);
-  padding: 18px;
-}
-.profile-menu-columns {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 16px;
-}
-.profile-menu-col {
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
-  min-width: 0;
-}
-.profile-menu-col-divider {
-  width: 1px;
-  background: var(--border);
-}
-.profile-menu-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.profile-menu-head .profile-avatar {
-  width: 40px;
-  height: 40px;
-}
-.profile-menu-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 2px 0;
-}
-
-.profile-bot-hint {
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--text-faint);
 }
 .profile-bot-link {
   color: var(--accent-base);
@@ -665,7 +472,7 @@ button {
 
 .theme-toggle-btn {
   background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
+  border: none;
   color: var(--text-dim);
   border-radius: 999px;
   width: 26px;
@@ -678,12 +485,12 @@ button {
 }
 .theme-toggle-btn:hover {
   color: var(--text);
-  border-color: var(--accent);
+  background: var(--bg-hover);
 }
 .searchbar.artist-search-box {
   width: auto;
   height: 34px;
-  margin: 0 10px 6px;
+  margin: 0 0 8px;
   background: var(--accent-soft);
   border: none;
   border-radius: var(--radius-md);
@@ -698,25 +505,19 @@ button {
   font-size: 12.5px;
 }
 
-.channel-avatar {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
 .channel-avatar-fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 8px;
+  font-size: 10.5px;
   font-weight: 700;
   background: var(--placeholder-bg);
   color: var(--placeholder-fg);
 }
 .channel-avatar {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
   border-radius: 50%;
   background: var(--bg-elevated-2);
   display: flex;
@@ -731,37 +532,34 @@ button {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  /* dvh rather than the layout viewport: with `interactive-widget=resizes-content`
-     in index.html, an on-screen keyboard shrinks this instead of leaving the
-     dialog centred behind itself */
-  height: var(--app-height);
+
+  height: 100vh;
   background: var(--scrim);
   backdrop-filter: blur(var(--scrim-blur));
   -webkit-backdrop-filter: blur(var(--scrim-blur));
   display: flex;
   align-items: center;
   justify-content: center;
-  /* The system bars are part of the padding on every screen, not only narrow
-     ones - a dialog must never begin underneath the status bar. What is left
-     after this padding is exactly the room a dialog may take, which is why the
-     dialog itself needs no arithmetic of its own. */
-  padding: max(16px, var(--safe-top)) 16px max(16px, var(--safe-bottom));
-  z-index: 100;
-  opacity: 0;
-  animation: modal-backdrop-in var(--duration-base) var(--ease-productive) forwards;
+
+  padding: 16px;
+
+  z-index: 150;
+  /*
+   * `both` rather than an opacity: 0 the animation has to undo. Eco mode drops every
+   * animation, and a dialog whose only way to become visible was the animation that
+   * faded it in opened invisible - with a backdrop still there to eat the next click.
+   * The from-state belongs to the animation, so it goes when the animation does.
+   */
+  animation: modal-backdrop-in var(--duration-base) var(--ease-productive) both;
 }
 .modal-backdrop.is-closing {
   animation: modal-backdrop-out 0.16s var(--ease-productive) forwards;
 }
 @media (max-width: 720px) {
-  /* Sitting the dialog near the top leaves the lower half of the screen to the
-     keyboard, so a focused field stays visible while it is being typed into. */
   .modal-backdrop {
     align-items: flex-start;
   }
-  /* Once a label is long enough to wrap the row, two half-width buttons read
-     better than one wide and one narrow. On a desktop the same rule would undo
-     space-between, which is what puts cancel and confirm at opposite ends. */
+
   .modal-footer .btn {
     flex: 1 1 auto;
     justify-content: center;
@@ -786,20 +584,15 @@ button {
 }
 .modal {
   width: min(420px, 100%);
-  /* 100% of the backdrop's content box - what is left once its padding has
-     taken out the system bars and the margin. A vh figure would be measured
-     against the whole screen instead, which is how a dialog ended up taller
-     than the room it had whenever a keyboard or a status bar was in the way. */
+
   max-height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg-elevated);
-  border: 1px solid color-mix(in srgb, var(--blue) 18%, var(--border-strong));
   border-radius: 22px;
-  box-shadow: var(--shadow-panel);
   overflow: hidden;
-  opacity: 0;
-  animation: modal-in var(--duration-base) var(--ease-decelerate) forwards;
+  /* Same as the backdrop above: the from-state lives in the keyframes, not here. */
+  animation: modal-in var(--duration-base) var(--ease-decelerate) both;
 }
 .modal.is-closing {
   animation: modal-out 0.16s var(--ease-productive) forwards;
@@ -829,9 +622,8 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--border);
-  /* the body is the only part that may shrink or scroll */
+  padding: 18px 20px 12px;
+
   flex: none;
 }
 .modal-header h2 {
@@ -848,17 +640,12 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--border);
+  padding: 8px 20px 16px;
   flex: none;
-  /* a long button label on a narrow phone wraps to a second row rather than
-     pushing its neighbour off the edge */
+
   flex-wrap: wrap;
 }
-/* Every dialog's middle section, whatever else it is called. It is the part
-   that scrolls, so it is also the only one allowed to shrink: `min-height: 0`
-   undoes the flex default that would otherwise let it push a footer off the
-   screen instead of scrolling. */
+
 .modal-body {
   display: flex;
   flex-direction: column;
@@ -868,7 +655,7 @@ button {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* momentum scrolling inside the dialog on iOS */
+
   -webkit-overflow-scrolling: touch;
 }
 .modal-body p {
@@ -888,10 +675,52 @@ button {
   color: var(--text-dim);
 }
 
-@media (max-width: 640px) {
-  html,
-  body,
-  #root {
-    height: var(--app-height);
-  }
+/*
+ * Eco mode. Artwork is skipped in JS - see app/ecoMode.ts - so what is left here is the
+ * paint cost: every blur is a full-size offscreen buffer the compositor keeps per layer,
+ * and every running animation keeps its layer alive. Both go.
+ */
+:root[data-eco] *,
+:root[data-eco] *::before,
+:root[data-eco] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  animation: none !important;
+  transition: none !important;
+  will-change: auto !important;
+}
+
+/* The glass panels lean on their blur to stay readable; make them solid instead. */
+:root[data-eco] {
+  --scrim-blur: 0px;
+  --glass-sat: 100%;
+  --glass-bg: var(--bg-elevated);
+}
+
+/*
+ * Every one of those panels is translucent because a blur sat behind it. With the blur
+ * gone they would let the page bleed through, so they go opaque instead.
+ */
+:root[data-eco] .sidebar,
+:root[data-eco] .app-main,
+:root[data-eco] .player-bar,
+:root[data-eco] .window-controls {
+  background: var(--bg-elevated);
+}
+:root[data-eco] .toast {
+  background: var(--bg-elevated-2);
+}
+:root[data-eco] .track-view-pin::before {
+  background-color: var(--bg-elevated);
+}
+
+/*
+ * Only when the artwork half is off, and only the song covers: there is one per row at
+ * whatever size it was published, which is the whole cost. A channel or a playlist has a
+ * single picture drawn from a 256px preview and there are a few dozen of them in the
+ * app, so they stay - a library with no faces in it reads as broken rather than as a
+ * saving. Avatars were never in this list either.
+ */
+:root[data-no-art] .track-thumbnail img {
+  display: none !important;
 }

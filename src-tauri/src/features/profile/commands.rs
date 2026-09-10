@@ -1,6 +1,3 @@
-//! The IPC surface of the profile: now playing, autostart, fullscreen, language.
-
-#[cfg(desktop)]
 use tauri::Manager;
 use tauri::{AppHandle, State};
 
@@ -46,9 +43,35 @@ pub(crate) fn set_autostart_enabled(app: AppHandle, enabled: bool) -> Result<(),
 }
 
 #[tauri::command]
-pub(crate) async fn get_fullscreen_enabled(state: State<'_, AppState>) -> Result<bool, String> {
+pub(crate) async fn detect_language() -> String {
+    Box::pin(async move { service::detect_language().await }).await
+}
+
+#[tauri::command]
+pub(crate) fn toggle_fullscreen(app: AppHandle) -> Result<bool, String> {
+    let window = app.get_webview_window("main").ok_or("no main window")?;
+    let is_fullscreen = window.is_fullscreen().map_err(|e| e.to_string())?;
+    window
+        .set_fullscreen(!is_fullscreen)
+        .map_err(|e| e.to_string())?;
+    Ok(!is_fullscreen)
+}
+
+#[tauri::command]
+pub(crate) async fn list_profile_music(
+    state: State<'_, AppState>,
+) -> Result<Vec<super::music::ProfileTrack>, String> {
+    Box::pin(async move { super::music::list(state).await.map_err(String::from) }).await
+}
+
+#[tauri::command]
+pub(crate) async fn add_profile_music(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    track_id: String,
+) -> Result<(), String> {
     Box::pin(async move {
-        service::fullscreen_enabled(state)
+        super::music::add(state, app, track_id)
             .await
             .map_err(String::from)
     })
@@ -56,43 +79,44 @@ pub(crate) async fn get_fullscreen_enabled(state: State<'_, AppState>) -> Result
 }
 
 #[tauri::command]
-pub(crate) async fn set_fullscreen_enabled(
-    #[allow(unused_variables)] app: AppHandle,
+pub(crate) async fn remove_profile_music(
     state: State<'_, AppState>,
-    enabled: bool,
+    app: AppHandle,
+    document_id: String,
 ) -> Result<(), String> {
     Box::pin(async move {
-        service::set_fullscreen_enabled(state, enabled)
+        super::music::remove(state, app, document_id)
             .await
-            .map_err(String::from)?;
-        #[cfg(desktop)]
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.set_fullscreen(enabled);
-        }
-        Ok(())
+            .map_err(String::from)
     })
     .await
 }
 
 #[tauri::command]
-pub(crate) async fn detect_language() -> String {
-    Box::pin(async move { service::detect_language().await }).await
+pub(crate) async fn reorder_profile_music(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    document_id: String,
+    after_document_id: Option<String>,
+) -> Result<(), String> {
+    Box::pin(async move {
+        super::music::reorder(state, app, document_id, after_document_id)
+            .await
+            .map_err(String::from)
+    })
+    .await
 }
 
 #[tauri::command]
-pub(crate) fn toggle_fullscreen(app: AppHandle) -> Result<bool, String> {
-    #[cfg(desktop)]
-    {
-        let window = app.get_webview_window("main").ok_or("no main window")?;
-        let is_fullscreen = window.is_fullscreen().map_err(|e| e.to_string())?;
-        window
-            .set_fullscreen(!is_fullscreen)
-            .map_err(|e| e.to_string())?;
-        Ok(!is_fullscreen)
-    }
-    #[cfg(not(desktop))]
-    {
-        let _ = app;
-        Ok(false)
-    }
+pub(crate) async fn toggle_profile_music(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    track_id: String,
+) -> Result<bool, String> {
+    Box::pin(async move {
+        super::music::toggle(state, app, track_id)
+            .await
+            .map_err(String::from)
+    })
+    .await
 }

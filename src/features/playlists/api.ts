@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { DownloadStats, Playlist, Track } from "@/shared/api/types";
 
 export const playlistsApi = {
+  recentAdds: (hours: number) => invoke<Record<string, number>>("playlist_recent_adds", { hours }),
   listPlaylists: () => invoke<Playlist[]>("list_playlists"),
   createPlaylist: (name: string) => invoke<Playlist>("create_playlist", { name }),
   deletePlaylist: (playlistId: string) => invoke<void>("delete_playlist", { playlistId }),
@@ -21,6 +22,5 @@ export const playlistsApi = {
     invoke<Playlist>("set_playlist_cover", { playlistId, sourcePath }),
   clearPlaylistCover: (playlistId: string) =>
     invoke<Playlist>("clear_playlist_cover", { playlistId }),
-  /** The first few tracks of each playlist, to build a cover out of. */
   playlistCoverSources: () => invoke<Record<string, string[]>>("playlist_cover_sources"),
 };

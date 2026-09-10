@@ -1,5 +1,3 @@
-//! The player thread and the handle the rest of the app talks to it through.
-
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -20,6 +18,7 @@ enum Command {
     Stop(u64),
     StopForce,
     SetVolume(f32),
+    SetDevice(Option<String>),
     Seek(f64),
     GetPosition(mpsc::Sender<PlaybackState>),
 }
@@ -45,31 +44,64 @@ fn default_device_name() -> Option<String> {
         .and_then(|device| device.name().ok())
 }
 
-fn ensure_output(output: &mut Option<Output>) -> Result<OutputStreamHandle, String> {
-    let current = default_device_name();
+pub(crate) fn output_devices() -> Vec<String> {
+    let Ok(devices) = rodio::cpal::default_host().output_devices() else {
+        return Vec::new();
+    };
+    let mut names: Vec<String> = devices.filter_map(|device| device.name().ok()).collect();
+    names.dedup();
+    names
+}
+
+fn wanted_device(preferred: Option<&str>) -> Option<String> {
+    match preferred {
+        Some(name) if output_devices().iter().any(|d| d == name) => Some(name.to_string()),
+        _ => default_device_name(),
+    }
+}
+
+fn open_stream(name: Option<&str>) -> Result<(OutputStream, OutputStreamHandle), String> {
+    if let Some(name) = name {
+        let found = rodio::cpal::default_host()
+            .output_devices()
+            .ok()
+            .and_then(|mut it| it.find(|d| d.name().ok().as_deref() == Some(name)));
+        if let Some(device) = found {
+            return OutputStream::try_from_device(&device)
+                .map_err(|err| format!("cannot open {name}: {err}"));
+        }
+    }
+    OutputStream::try_default().map_err(|err| format!("no audio output device: {err}"))
+}
+
+fn ensure_output(
+    output: &mut Option<Output>,
+    preferred: Option<&str>,
+) -> Result<OutputStreamHandle, String> {
+    let wanted = wanted_device(preferred);
     if let Some(open) = output.as_ref() {
-        if open.device == current {
+        if open.device == wanted {
             return Ok(open.handle.clone());
         }
         *output = None;
     }
 
-    let (stream, handle) =
-        OutputStream::try_default().map_err(|err| format!("no audio output device: {err}"))?;
+    let (stream, handle) = open_stream(wanted.as_deref())?;
     *output = Some(Output {
         _stream: stream,
         handle: handle.clone(),
-        device: current,
+        device: wanted,
     });
     Ok(handle)
 }
 
 fn start_playback(
     output: &mut Option<Output>,
+    preferred: Option<&str>,
     path: &PathBuf,
     volume: f32,
 ) -> Result<Sink, String> {
-    let stream_handle = ensure_output(output)?;
+    let stream_handle = ensure_output(output, preferred)?;
 
     let source =
         FfmpegSource::open(path).map_err(|err| format!("failed to decode {path:?}: {err}"))?;
@@ -91,53 +123,9 @@ pub(crate) struct PlayerHandle {
     current_path: Arc<Mutex<Option<PathBuf>>>,
 }
 
-// only Android hands the speaker between apps; the desktop ducks instead
-#[cfg(target_os = "android")]
-mod platform {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::{mpsc, OnceLock};
-
-    use super::Command;
-
-    /// The audio focus callback arrives on a JVM thread holding nothing of ours.
-    pub(super) static REMOTE: OnceLock<mpsc::Sender<Command>> = OnceLock::new();
-
-    /// Only a pause we did not ask for is ours to undo.
-    static PAUSED_BY_US: AtomicBool = AtomicBool::new(false);
-
-    pub(crate) fn foreign_audio_changed(playing: bool) {
-        let Some(tx) = REMOTE.get() else { return };
-        if playing {
-            if !PAUSED_BY_US.swap(true, Ordering::SeqCst) {
-                let _ = tx.send(Command::Pause);
-                crate::android::set_playing(false);
-            }
-        } else if PAUSED_BY_US.swap(false, Ordering::SeqCst) {
-            let _ = tx.send(Command::Resume);
-            crate::android::set_playing(true);
-        }
-    }
-
-    /// The user asked for it, so the platform gives up its claim to undo it.
-    pub(super) fn forget_our_pause() {
-        PAUSED_BY_US.store(false, Ordering::SeqCst);
-    }
-}
-
-#[cfg(target_os = "android")]
-pub(crate) use platform::foreign_audio_changed;
-
-/// Nothing competes for the speaker here, so there is nothing to forget.
-fn forget_platform_pause() {
-    #[cfg(target_os = "android")]
-    platform::forget_our_pause();
-}
-
 impl PlayerHandle {
     pub(crate) fn spawn() -> Self {
         let (tx, rx) = mpsc::channel::<Command>();
-        #[cfg(target_os = "android")]
-        let _ = platform::REMOTE.set(tx.clone());
         let current_path: Arc<Mutex<Option<PathBuf>>> = Arc::new(Mutex::new(None));
         let current_path_thread = current_path.clone();
 
@@ -147,6 +135,7 @@ impl PlayerHandle {
             let mut last_seq: u64 = 0;
 
             let mut volume: f32 = 1.0;
+            let mut preferred: Option<String> = None;
             let mut paused = false;
             let mut last_position = 0.0f64;
             let mut stalled_since: Option<Instant> = None;
@@ -160,7 +149,8 @@ impl PlayerHandle {
                         }
                         last_seq = seq;
 
-                        let result = start_playback(&mut output, &path, volume);
+                        let result =
+                            start_playback(&mut output, preferred.as_deref(), &path, volume);
                         match result {
                             Ok(new_sink) => {
                                 sink = Some(new_sink);
@@ -219,6 +209,36 @@ impl PlayerHandle {
                             s.set_volume(v);
                         }
                     }
+                    Command::SetDevice(name) => {
+                        if preferred == name {
+                            continue;
+                        }
+                        preferred = name;
+                        let at = sink.as_ref().map(|s| s.get_pos().as_secs_f64());
+                        let path = current_path_thread.lock().unwrap().clone();
+                        if let (Some(at), Some(path)) = (at, path) {
+                            if let Some(dead) = sink.take() {
+                                dead.stop();
+                            }
+                            output = None;
+                            match start_playback(&mut output, preferred.as_deref(), &path, volume) {
+                                Ok(fresh) => {
+                                    let _ = fresh.try_seek(Duration::from_secs_f64(at));
+                                    if paused {
+                                        fresh.pause();
+                                    }
+                                    last_position = at;
+                                    stalled_since = None;
+                                    sink = Some(fresh);
+                                }
+                                Err(err) => {
+                                    crate::log!("audio: could not move playback: {err}");
+                                }
+                            }
+                        } else {
+                            output = None;
+                        }
+                    }
                     Command::Seek(secs) => {
                         stalled_since = None;
                         last_position = secs.max(0.0);
@@ -248,7 +268,12 @@ impl PlayerHandle {
                                                 dead.stop();
                                             }
                                             output = None;
-                                            match start_playback(&mut output, &path, volume) {
+                                            match start_playback(
+                                                &mut output,
+                                                preferred.as_deref(),
+                                                &path,
+                                                volume,
+                                            ) {
                                                 Ok(fresh) => {
                                                     let _ = fresh.try_seek(
                                                         Duration::from_secs_f64(position),
@@ -305,16 +330,10 @@ impl PlayerHandle {
     }
 
     pub(crate) fn pause(&self) {
-        forget_platform_pause();
-        #[cfg(target_os = "android")]
-        crate::android::set_playing(false);
         let _ = self.tx.send(Command::Pause);
     }
 
     pub(crate) fn resume(&self) {
-        forget_platform_pause();
-        #[cfg(target_os = "android")]
-        crate::android::set_playing(true);
         let _ = self.tx.send(Command::Resume);
     }
 
@@ -323,13 +342,15 @@ impl PlayerHandle {
     }
 
     pub(crate) fn stop_now(&self) {
-        #[cfg(target_os = "android")]
-        crate::android::stopped();
         let _ = self.tx.send(Command::StopForce);
     }
 
     pub(crate) fn set_volume(&self, volume: f32) {
         let _ = self.tx.send(Command::SetVolume(volume));
+    }
+
+    pub(crate) fn set_device(&self, name: Option<String>) {
+        let _ = self.tx.send(Command::SetDevice(name));
     }
 
     pub(crate) fn seek(&self, seconds: f64) {

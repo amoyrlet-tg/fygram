@@ -1,5 +1,3 @@
-//! What the UI is told about sync, and the handle the engine is woken through.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 

@@ -1,5 +1,3 @@
-//! The Linux probe: which audio streams are live, and whether a Telegram client owns one.
-
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;

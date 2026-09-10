@@ -1,5 +1,3 @@
-//! The login flow, and the questions the app asks about the session it already has.
-
 use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -20,8 +18,6 @@ pub(crate) async fn request_login_code(
     match state.telegram.request_login_code(&phone, &api_hash).await {
         Ok(()) => Ok(()),
         Err(err) if format!("{err:#}").contains("AUTH_RESTART") => {
-            // the key belongs to another api_id, so telegram refuses to send a
-            // code until the authorization starts over
             let app_dir = app
                 .path()
                 .app_data_dir()
@@ -49,6 +45,7 @@ pub(crate) async fn submit_code(
     match state.telegram.submit_code(&code).await? {
         LoginOutcome::Success => {
             mark_signed_in(&state).await;
+            crate::shared::telegram::watch_profile(app.clone());
             crate::features::cloud::restore::spawn_cloud_restore(app);
             Ok("success")
         }
@@ -63,6 +60,7 @@ pub(crate) async fn submit_password(
 ) -> Result<(), AppError> {
     state.telegram.submit_password(&password).await?;
     mark_signed_in(&state).await;
+    crate::shared::telegram::watch_profile(app.clone());
     crate::features::cloud::restore::spawn_cloud_restore(app);
     Ok(())
 }
@@ -77,7 +75,6 @@ pub(crate) struct Credentials {
     pub(crate) api_hash: String,
 }
 
-/// The keys the setup screen starts filled with.
 pub(crate) async fn read_credentials(
     state: State<'_, AppState>,
 ) -> Result<Option<Credentials>, AppError> {
@@ -110,8 +107,6 @@ pub(crate) async fn save_credentials(
     }
 
     let session_path = app_dir.join("telegram.session");
-    // an unknown owner is left alone: dropping a working session costs a
-    // full re-login for nothing
     if session_owner.is_some_and(|owner| owner != api_id) {
         session_store::forget(&session_path);
         repository::remember_authorized(&state.db, false).await;
@@ -177,11 +172,6 @@ pub(crate) async fn session_state(state: State<'_, AppState>) -> Result<SessionS
     })
 }
 
-/// The colour a picture reads as, computed here rather than in the webview.
-///
-/// The renderer only ever wanted three numbers out of the file, so it gets
-/// three numbers: sending the picture itself meant a base64 string and a
-/// decoded bitmap per cover, both of which the webview then held on to.
 pub(crate) async fn ambient_colour(path: String) -> Result<Option<String>, AppError> {
     let bytes = tokio::fs::read(&path).await?;
     Ok(tokio::task::spawn_blocking(move || {

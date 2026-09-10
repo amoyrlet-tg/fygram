@@ -2,11 +2,8 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { CurrentUser, DuckingConfig } from "@/shared/api/types";
 import { useProfile } from "@/features/profile/useProfile";
 import { useTheme, type Theme } from "@/app/useTheme";
+import { setEcoEnabled, setEcoKeepsArt, useEco, useEcoKeepsArt } from "@/app/ecoMode";
 
-/**
- * Everything the profile menu shows. Produced exactly once: `useTheme` writes to
- * the document and `useProfile` polls, so a second copy would fight the first.
- */
 export interface Settings {
   currentUser: CurrentUser | null;
 
@@ -19,17 +16,24 @@ export interface Settings {
   toggleProfileSync: (enabled: boolean) => void;
   autostartEnabled: boolean;
   toggleAutostart: (enabled: boolean) => void;
-  fullscreenEnabled: boolean;
-  toggleFullscreen: (enabled: boolean) => void;
   ducking: DuckingConfig;
   toggleDucking: (enabled: boolean) => void;
+  ecoMode: boolean;
+  toggleEcoMode: (enabled: boolean) => void;
+  ecoKeepsArt: boolean;
+  toggleEcoKeepsArt: (enabled: boolean) => void;
 }
 
 const SettingsContext = createContext<Settings | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const profile = useProfile();
-  const { theme, accent, handleSetTheme, handleSetAccent } = useTheme();
+  const colour = profile.currentUser?.profile_colour;
+  const palette = colour ? (colour.dark_bg.length ? colour.dark_bg : colour.bg) : [];
+  const profileAccent = palette.length ? palette[palette.length - 1] : null;
+  const { theme, accent, handleSetTheme, handleSetAccent } = useTheme(profileAccent);
+  const ecoMode = useEco();
+  const ecoKeepsArt = useEcoKeepsArt();
 
   const value = useMemo<Settings>(
     () => ({
@@ -42,12 +46,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       toggleProfileSync: profile.handleToggleProfileSync,
       autostartEnabled: profile.autostartEnabled,
       toggleAutostart: profile.handleToggleAutostart,
-      fullscreenEnabled: profile.fullscreenEnabled,
-      toggleFullscreen: profile.handleToggleFullscreen,
       ducking: profile.ducking,
       toggleDucking: profile.handleToggleDucking,
+      ecoMode,
+      toggleEcoMode: setEcoEnabled,
+      ecoKeepsArt,
+      toggleEcoKeepsArt: setEcoKeepsArt,
     }),
-    [profile, theme, accent, handleSetTheme, handleSetAccent],
+    [profile, theme, accent, handleSetTheme, handleSetAccent, ecoMode, ecoKeepsArt],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

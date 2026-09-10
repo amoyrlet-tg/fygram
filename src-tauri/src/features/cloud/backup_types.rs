@@ -1,5 +1,3 @@
-//! The shape of the documents kept in Saved Messages, and how to read the ones written by an older version.
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

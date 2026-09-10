@@ -1,12 +1,8 @@
-//! The probe where there is no mixer to ask - Android, and any desktop that is
-//! neither Linux nor Windows.
-
 use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::Notify;
 
-// never built here, but the loop matches on it
 #[allow(dead_code)]
 pub(crate) enum Probe {
     Known(bool),

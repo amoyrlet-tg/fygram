@@ -1,5 +1,3 @@
-//! The IPC surface of playlists: creating, filling, reordering and deleting one.
-
 use tauri::{AppHandle, State};
 
 use crate::features::library::media;
@@ -152,4 +150,17 @@ pub(crate) async fn playlist_cover_sources(
     state: State<'_, AppState>,
 ) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
     Box::pin(async move { service::cover_sources(state).await.map_err(String::from) }).await
+}
+
+#[tauri::command]
+pub(crate) async fn playlist_recent_adds(
+    state: State<'_, AppState>,
+    hours: i64,
+) -> Result<std::collections::HashMap<String, i64>, String> {
+    Box::pin(async move {
+        service::recent_adds(state, hours)
+            .await
+            .map_err(String::from)
+    })
+    .await
 }

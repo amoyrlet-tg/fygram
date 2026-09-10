@@ -1,11 +1,3 @@
-//! A running account of where the app's memory goes, written to a file.
-//!
-//! The ordinary log is compiled out of release builds and goes to stderr,
-//! which nobody sees once the app is installed. This one is always on and
-//! lands next to the database, because the questions it answers - is the
-//! renderer growing, is it the database, the artwork, or the webview holding
-//! event listeners - can only be answered on the machine that has the problem.
-
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -16,18 +8,12 @@ use super::process;
 use crate::shared::media_paths;
 use crate::AppState;
 
-/// Often enough to see a trend within minutes, rarely enough that the sampling
-/// is not itself part of the measurement.
 const SAMPLE_EVERY: Duration = Duration::from_secs(15);
 
-/// Walking the media tree costs real IO, so it happens once a minute.
 const DISK_EVERY: u32 = 4;
 
 pub(crate) const LOG_FILE: &str = "memory.log";
 
-/// What the webview reports about itself. It knows things the OS cannot see:
-/// the size of the JS heap, how many nodes are in the document, how big our
-/// own caches have grown, and how many event listeners are registered.
 #[derive(Clone, Default, serde::Deserialize)]
 pub(crate) struct WebviewSample {
     pub(crate) js_heap_used: Option<u64>,
@@ -35,9 +21,7 @@ pub(crate) struct WebviewSample {
     pub(crate) js_heap_limit: Option<u64>,
     pub(crate) dom_nodes: Option<u64>,
     pub(crate) tracks_in_state: Option<u64>,
-    /// cache name -> entries held
     pub(crate) caches: Option<Vec<(String, u64)>>,
-    /// event name -> listeners registered for it
     pub(crate) listeners: Option<Vec<(String, u64)>>,
 }
 
@@ -171,7 +155,6 @@ async fn disk_line(app: &AppHandle, db: &SqlitePool) -> String {
     )
 }
 
-/// Adds up a directory tree, optionally skipping one child by name.
 async fn tree_size(root: std::path::PathBuf, skip: Option<&'static str>) -> (u64, u64) {
     tokio::task::spawn_blocking(move || {
         let mut files = 0u64;
@@ -241,13 +224,12 @@ fn webview_line() -> String {
         })
         .unwrap_or_else(|| "?".to_string());
 
-    // the one that mattered: a listener array that only ever grew
     let listeners = sample
         .listeners
         .as_ref()
         .map(|entries| {
             let mut sorted = entries.clone();
-            sorted.sort_by(|a, b| b.1.cmp(&a.1));
+            sorted.sort_by_key(|entry| std::cmp::Reverse(entry.1));
             sorted
                 .iter()
                 .take(6)

@@ -9,9 +9,7 @@ export interface Channel {
   last_full_synced_at: string | null;
   is_active: boolean;
 
-  /** null means Telegram has never been asked; a sync fills it in. */
   can_edit: boolean | null;
-  /** What replacing a forwarded track needs. */
   can_repost: boolean | null;
   rights_checked_at: string | null;
 }
@@ -20,6 +18,7 @@ export interface Track {
   id: string;
   channel_id: string;
   tg_message_id: number;
+  tg_document_id: number | null;
   file_path: string;
   file_hash: string;
   title: string | null;
@@ -30,8 +29,6 @@ export interface Track {
   play_count: number;
   published_at: string | null;
 
-  /** Telegram refuses to edit a forward, so the dialog replaces it instead.
-   *  null means no sync has looked yet. */
   forwarded: boolean | null;
   forwarded_from: string | null;
   forwarded_at: string | null;
@@ -43,13 +40,28 @@ export interface Playlist {
   is_smart: boolean;
   smart_rule: string | null;
   created_at: string;
-  /** The picture it was given. Null means one is built from its tracks. */
   cover_path: string | null;
 }
 
 export interface EmojiStatus {
   path: string;
   kind: "lottie" | "video" | "image";
+}
+
+export interface ProfileColour {
+  bg: string[];
+  dark_bg: string[];
+  background_emoji: EmojiStatus | null;
+  pattern: string | null;
+  text: string | null;
+}
+
+export interface ProfileTrack {
+  document_id: string;
+  title: string;
+  artist: string | null;
+  duration_sec: number | null;
+  track_id: string | null;
 }
 
 export interface CurrentUser {
@@ -59,6 +71,8 @@ export interface CurrentUser {
   username: string | null;
   avatar_path: string | null;
   emoji_status: EmojiStatus | null;
+  profile_colour: ProfileColour | null;
+  premium: boolean;
 }
 
 export type LoginOutcome = "success" | "password_required";
@@ -104,12 +118,6 @@ export interface IndexingBatch {
   completed: number;
 }
 
-export interface BroadcastConfig {
-  enabled: boolean;
-  url: string;
-  has_token: boolean;
-}
-
 export interface CacheStats {
   total_bytes: number;
   track_count: number;
@@ -139,6 +147,7 @@ export interface PlaybackState {
 export interface CachePlan {
   keep_playlist_ids: string[];
   keep_channel_ids: string[];
+  keep_track_ids: string[];
   drop_orphans: boolean;
 }
 
@@ -156,6 +165,8 @@ export interface MediaRootInfo {
   is_default: boolean;
   file_count: number;
   total_bytes: number;
+  disk_bytes: number;
+  free_bytes: number;
 }
 
 export interface RelocateResult {
@@ -180,4 +191,17 @@ export interface SessionState {
   authorized: boolean;
   session_invalid: boolean;
   has_local_library: boolean;
+}
+
+export interface AudioOutputs {
+  devices: string[];
+  selected: string | null;
+}
+
+export interface StorageSlice {
+  id: string;
+  title: string;
+  avatar_path: string | null;
+  bytes: number;
+  tracks: number;
 }

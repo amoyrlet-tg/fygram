@@ -1,1 +1,0 @@
-export { SearchPane } from "./SearchPane";

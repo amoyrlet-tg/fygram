@@ -10,7 +10,6 @@ const PORTAL = "https://my.telegram.org/apps";
 
 type Check = { ok: boolean; hint: string | null };
 
-/** Digits only, and long enough to be a real app id rather than a typo. */
 function checkApiId(raw: string, t: (k: string) => string): Check {
   const value = raw.trim();
   if (!value) return { ok: false, hint: null };
@@ -27,7 +26,6 @@ function checkApiId(raw: string, t: (k: string) => string): Check {
   return { ok: true, hint: null };
 }
 
-/** Exactly 32 hex characters, which is what the portal prints. */
 function checkApiHash(raw: string, t: (k: string) => string): Check {
   const value = raw.trim();
   if (!value) return { ok: false, hint: null };
@@ -50,7 +48,6 @@ export function TelegramSetup({ onDone }: { onDone: () => void }) {
   const [touched, setTouched] = useState({ id: false, hash: false });
   const [slide, setSlide] = useState(0);
 
-  // already stored: no need to fetch them from my.telegram.org again
   useEffect(() => {
     let alive = true;
     authApi
@@ -166,7 +163,6 @@ export function TelegramSetup({ onDone }: { onDone: () => void }) {
           </span>
           <input
             inputMode="numeric"
-            // some keyboards want a pattern too before showing a number pad
             pattern="[0-9]*"
             spellCheck={false}
             autoComplete="off"

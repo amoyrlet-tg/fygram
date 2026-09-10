@@ -1,14 +1,3 @@
-//! fygram: a music library built out of Telegram channels.
-//!
-//! The shared state, the plugin wiring, and the table of what the frontend may
-//! call - which is the backend's entire public surface. Conventions: STYLE.md.
-
-/// The backend's only way of writing to the console.
-///
-/// Compiles to nothing in a release build: a shipped app should not narrate what
-/// it is doing to anyone watching the process, and the format strings go with
-/// it. `cfg!` rather than `#[cfg]` so the arguments still count as used and the
-/// line still has to typecheck either way.
 #[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {{
@@ -18,8 +7,6 @@ macro_rules! log {
     }};
 }
 
-#[cfg(target_os = "android")]
-mod android;
 mod bootstrap;
 mod features;
 mod shared;
@@ -29,7 +16,6 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-#[cfg(desktop)]
 use tauri::Manager;
 
 use features::playback::audio::PlayerHandle;
@@ -37,11 +23,8 @@ use features::sync::SyncHandle;
 use shared::telegram::TelegramState;
 
 use features::auth::commands as auth_commands;
-use features::broadcast::commands as broadcast_commands;
 use features::diagnostics::commands as diagnostics_commands;
-use features::docs as docs_commands;
 use features::ducking::commands as ducking_commands;
-use features::host as host_commands;
 use features::library::cache::commands as cache_commands;
 use features::library::channels::commands as channel_commands;
 use features::library::tracks::commands as track_commands;
@@ -63,7 +46,6 @@ pub(crate) struct AppState {
     pub tasks: tokio_util::task::TaskTracker,
 }
 
-#[cfg(desktop)]
 fn stagger_if_racing() {
     let Some(data_dir) = dirs::data_dir() else {
         return;
@@ -86,31 +68,23 @@ fn stagger_if_racing() {
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(desktop)]
     stagger_if_racing();
 
-    let mut builder = tauri::Builder::default();
-    #[cfg(desktop)]
-    {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
             }
-        }));
-    }
-    builder = builder.plugin(tauri_plugin_opener::init());
-    builder = builder.plugin(tauri_plugin_dialog::init());
-    #[cfg(desktop)]
-    {
-        builder = builder.plugin(tauri_plugin_autostart::init(
+        }))
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ));
-    }
 
     builder
         .setup(bootstrap::setup)
@@ -127,12 +101,9 @@ pub fn run() {
             auth_commands::ambient_colour,
             auth_commands::logout,
             diagnostics_commands::record_memory_sample,
-            broadcast_commands::get_broadcast_config,
-            broadcast_commands::set_broadcast_config,
-            broadcast_commands::check_broadcast_target,
-            broadcast_commands::broadcast_now_playing,
-            broadcast_commands::broadcast_stop,
             cache_commands::get_cache_stats,
+            cache_commands::storage_breakdown,
+            cache_commands::storage_file_sizes,
             cache_commands::cleanup_cache,
             cache_commands::preview_cache_cleanup,
             cache_commands::apply_cache_cleanup,
@@ -142,11 +113,11 @@ pub fn run() {
             channel_commands::refresh_channel_rights,
             channel_commands::cancel_sync,
             channel_commands::download_channel,
+            channel_commands::rename_channel,
+            channel_commands::set_channel_photo,
             channel_commands::delete_channel,
-            docs_commands::open_docs_window,
             ducking_commands::get_ducking_config,
             ducking_commands::set_ducking_config,
-            host_commands::host_info,
             playback_commands::play_track,
             playback_commands::prefetch_track,
             playback_commands::pause_playback,
@@ -155,7 +126,10 @@ pub fn run() {
             playback_commands::set_volume,
             playback_commands::seek_playback,
             playback_commands::get_playback_position,
+            playback_commands::list_audio_outputs,
+            playback_commands::set_audio_output,
             playlist_commands::list_playlists,
+            playlist_commands::playlist_recent_adds,
             playlist_commands::create_playlist,
             playlist_commands::download_playlist,
             playlist_commands::list_playlist_tracks,
@@ -169,11 +143,14 @@ pub fn run() {
             playlist_commands::playlist_cover_sources,
             profile_commands::get_profile_sync_enabled,
             profile_commands::set_profile_sync_enabled,
+            profile_commands::list_profile_music,
+            profile_commands::add_profile_music,
+            profile_commands::toggle_profile_music,
+            profile_commands::remove_profile_music,
+            profile_commands::reorder_profile_music,
             profile_commands::set_now_playing_track,
             profile_commands::get_autostart_enabled,
             profile_commands::set_autostart_enabled,
-            profile_commands::get_fullscreen_enabled,
-            profile_commands::set_fullscreen_enabled,
             profile_commands::toggle_fullscreen,
             profile_commands::detect_language,
             storage_commands::get_media_root,

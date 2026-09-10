@@ -2,16 +2,12 @@ import { useEffect } from "react";
 import type { Track } from "@/shared/api/types";
 import { trackLabel } from "@/shared/lib/format";
 import { avatarGradientCss } from "@/shared/lib/avatarColor";
-import { useTrackCover } from "@/features/tracks/useTrackCover";
+import { usePlayingCover } from "@/features/tracks/useTrackCover";
 import { useT } from "@/shared/i18n";
 import { Crossfade } from "./Crossfade";
 import { CloseIcon } from "@/shared/ui/icons";
 import "./NowPlaying.css";
 
-/**
- * The page behind the artwork, in the cover's own colours. Radial pools rather
- * than one gradient: a single vertical band reads as a flat wash.
- */
 function ambientBackground(palette: string[] | null): string {
   const pools = palette?.length
     ? palette
@@ -21,14 +17,11 @@ function ambientBackground(palette: string[] | null): string {
         "color-mix(in srgb, var(--accent-base) 78%, black)",
       ];
 
-  // pulled towards the app background so text stays readable over it
   const wash = (colour: string, amount: number) =>
     `color-mix(in srgb, ${colour} ${amount}%, var(--bg))`;
 
   const [first, second = pools[0], third = pools[0]] = pools;
 
-  // a cover can be pure white or pure black, and either at full strength
-  // swallows the text in one theme
   return [
     `radial-gradient(90% 70% at 12% 4%, ${wash(first, 52)} 0%, transparent 66%)`,
     `radial-gradient(85% 65% at 88% 10%, ${wash(second, 42)} 0%, transparent 62%)`,
@@ -39,7 +32,7 @@ function ambientBackground(palette: string[] | null): string {
 
 export function NowPlaying({ track, onClose }: { track: Track; onClose: () => void }) {
   const t = useT();
-  const cover = useTrackCover(track.id);
+  const cover = usePlayingCover(track.id);
   const label = trackLabel(track);
 
   useEffect(() => {
@@ -53,12 +46,16 @@ export function NowPlaying({ track, onClose }: { track: Track; onClose: () => vo
   const background = ambientBackground(cover?.palette ?? null);
 
   return (
-    <section className="now-playing">
+    <section className="now-playing" onClick={onClose}>
       <Crossfade id={background} className="now-playing-bg">
         {() => <div className="now-playing-bg-paint" style={{ background }} />}
       </Crossfade>
 
-      <header className="now-playing-top">
+      <header
+        className="now-playing-top"
+        data-tauri-drag-region
+        onClick={(e) => e.stopPropagation()}
+      >
         <span className="now-playing-album truncate">{track.album ?? label.title}</span>
         <button type="button" className="now-playing-close" onClick={onClose} title={t("Close")}>
           <CloseIcon size={16} />
@@ -66,7 +63,7 @@ export function NowPlaying({ track, onClose }: { track: Track; onClose: () => vo
       </header>
 
       <div className="now-playing-stage">
-        <div className="now-playing-art-frame">
+        <div className="now-playing-art-frame" onClick={(e) => e.stopPropagation()}>
           <Crossfade id={cover?.src ?? track.id} className="now-playing-art-layer">
             {() =>
               cover ? (
@@ -89,7 +86,7 @@ export function NowPlaying({ track, onClose }: { track: Track; onClose: () => vo
           </Crossfade>
         </div>
 
-        <div className="now-playing-text" key={track.id}>
+        <div className="now-playing-text" key={track.id} onClick={(e) => e.stopPropagation()}>
           <h1 className="now-playing-title truncate">{label.title}</h1>
           <p className="now-playing-artist truncate">{label.artist}</p>
         </div>

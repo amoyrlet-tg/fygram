@@ -4,11 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--panel-gap);
-  /* The system bars stand on the edges of an edge-to-edge activity, and a
-     tablet gets this layout too - without the insets the sidebar starts
-     underneath the clock. */
-  padding: calc(var(--panel-gap) + var(--safe-top)) var(--panel-gap)
-    calc(var(--panel-gap) + var(--safe-bottom));
+  padding: var(--panel-gap);
   background: var(--bg);
   box-sizing: border-box;
   overflow: hidden;
@@ -24,6 +20,7 @@
 }
 
 .app-main {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -31,7 +28,6 @@
   flex-direction: column;
   overflow: hidden;
 
-  padding: 0;
   background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
   backdrop-filter: blur(24px) saturate(150%);
   -webkit-backdrop-filter: blur(24px) saturate(150%);

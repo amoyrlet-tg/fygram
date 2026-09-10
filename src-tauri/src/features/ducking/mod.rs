@@ -1,9 +1,6 @@
-//! Getting out of the way when Telegram itself starts playing something.
-
 pub(crate) mod commands;
 pub(crate) mod service;
 
-// only these two can answer "is something else playing"
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 pub(crate) mod apps;
 #[cfg(any(target_os = "linux", target_os = "windows"))]

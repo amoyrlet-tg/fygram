@@ -1,8 +1,3 @@
-//! Decoding through ffmpeg, the way telegram desktop does it: one path for
-//! every container instead of a decoder per format.
-//!
-//! The build linked here is audio only - see packaging/ffmpeg/build-audio.sh.
-
 use std::collections::VecDeque;
 use std::path::Path;
 use std::sync::Once;
@@ -18,12 +13,10 @@ fn init() {
         if let Err(err) = ff::init() {
             crate::log!("audio: ffmpeg failed to initialise: {err}");
         }
-        // ffmpeg is chatty on stderr about every quirk it forgives
         ff::log::set_level(ff::log::Level::Quiet);
     });
 }
 
-/// Interleaved 16-bit samples at the file's own rate; rodio matches the device.
 pub(crate) struct FfmpegSource {
     input: ff::format::context::Input,
     decoder: ff::decoder::Audio,
@@ -81,22 +74,17 @@ impl FfmpegSource {
         })
     }
 
-    /// False when the file is exhausted.
     fn fill(&mut self) -> bool {
         let mut decoded = ff::frame::Audio::empty();
         let mut resampled = ff::frame::Audio::empty();
 
         loop {
             while self.decoder.receive_frame(&mut decoded).is_ok() {
-                // pcm hands over frames with no layout, and swresample then
-                // refuses them as "input changed"
                 if decoded.channel_layout().is_empty() {
                     let channels = decoded.channels().max(1);
                     decoded.set_channel_layout(ff::ChannelLayout::default(channels as i32));
                 }
 
-                // pcm reports its sample format only once decoding starts, so
-                // a resampler built from the decoder does nothing
                 if self.resampler.is_none() {
                     self.channels = decoded.channels().max(1);
                     self.rate = decoded.rate();
@@ -120,12 +108,9 @@ impl FfmpegSource {
                     return false;
                 };
                 if resampler.run(&decoded, &mut resampled).is_err() {
-                    // parameters can change mid-file; rebuild for what arrives
                     self.resampler = None;
                     continue;
                 }
-                // plane() covers half an interleaved stereo frame - every
-                // other sample dropped, a click at each boundary. data() is all.
                 let wanted = resampled.samples() * self.channels as usize;
                 let bytes = resampled.data(0);
                 let count = wanted.min(bytes.len() / 2);
@@ -142,7 +127,6 @@ impl FfmpegSource {
             }
 
             let Some((stream, packet)) = self.input.packets().next() else {
-                // no packets left: flush whatever the decoder still holds
                 if !self.drained {
                     self.drained = true;
                     let _ = self.decoder.send_eof();
@@ -218,8 +202,6 @@ mod tests {
     use super::*;
     use rodio::Source;
 
-    /// Stereo on purpose: a mono fixture hides the half-frame read that made
-    /// every track click.
     const CHANNELS: u16 = 2;
 
     fn write_tone(path: &Path) {
@@ -239,7 +221,7 @@ mod tests {
         wav.extend_from_slice(&(36 + pcm.len() as u32).to_le_bytes());
         wav.extend_from_slice(b"WAVEfmt ");
         wav.extend_from_slice(&16u32.to_le_bytes());
-        wav.extend_from_slice(&1u16.to_le_bytes()); // pcm
+        wav.extend_from_slice(&1u16.to_le_bytes());
         wav.extend_from_slice(&CHANNELS.to_le_bytes());
         wav.extend_from_slice(&RATE.to_le_bytes());
         wav.extend_from_slice(&(RATE * 2 * CHANNELS as u32).to_le_bytes());
@@ -269,8 +251,6 @@ mod tests {
 
         let decoded: Vec<i16> = source.collect();
 
-        // reading half of each frame still made sound, so the count is what
-        // catches it
         let expected = 44_100 / 2 * CHANNELS as usize;
         assert!(
             decoded.len() >= expected,

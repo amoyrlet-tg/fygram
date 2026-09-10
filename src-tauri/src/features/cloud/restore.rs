@@ -1,5 +1,3 @@
-//! Pulling the library back down on a machine that does not have one yet.
-
 use tauri::{AppHandle, Manager};
 
 use crate::shared::media_paths;

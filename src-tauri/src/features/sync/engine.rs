@@ -1,5 +1,3 @@
-//! The loop: when to push, when to pull, and how long to wait after a failure.
-
 use std::time::{Duration, Instant};
 
 use anyhow::Result;

@@ -1,4 +1,5 @@
-import { memo, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useMemo, useState, type ReactNode } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Channel, DownloadProgress, Playlist, SyncProgress } from "@/shared/api/types";
 import { View } from "@/app/view";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
@@ -10,16 +11,12 @@ import { fuzzyTextMatches } from "@/shared/lib/fuzzy";
 import { VARIOUS_ARTISTS_KEY } from "@/shared/lib/artists";
 import type { ArtistSummary } from "@/features/artists/useArtists";
 import { initials } from "@/shared/lib/initials";
-import { useAmbientColor } from "@/shared/hooks/useAmbientColor";
+import { avatarGradientCss } from "@/shared/lib/avatarColor";
 import { useT } from "@/shared/i18n";
-import {
-  ChevronDownIcon,
-  CloseIcon,
-  MusicNoteIcon,
-  PlusIcon,
-  RefreshIcon,
-} from "@/shared/ui/icons";
+import { ChevronDownIcon, CloseIcon, MusicNoteIcon, PlusIcon } from "@/shared/ui/icons";
 import "./Sidebar.css";
+
+const BOT_URL = "https://t.me/wwloadbot";
 
 export interface SidebarProps {
   channels: Channel[];
@@ -28,15 +25,29 @@ export interface SidebarProps {
   view: View;
   onSelectView: (v: View) => void;
   onAddChannel: () => void;
-  onCreatePlaylist: (name: string) => void;
-  /* Shown, not driven: syncing and downloading are started from a channel's or
-     a playlist's own page, but the sidebar still reports how they are going. */
+  onNewPlaylist: () => void;
   syncProgress: Record<string, SyncProgress & { done?: boolean; error?: string }>;
   downloadProgress: Record<string, DownloadProgress & { done?: boolean }>;
-  onMergeArtists: () => void;
   artistScopeTitle?: string | null;
   onClearArtistScope: () => void;
-  mergingArtists: boolean;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+}
+
+function useSection(storageKey: string) {
+  const [open, setOpenState] = useState(
+    () => localStorage.getItem(`sidebar_section_${storageKey}`) === "1",
+  );
+  const setOpen = useCallback(
+    (next: boolean) => {
+      setOpenState(next);
+      try {
+        localStorage.setItem(`sidebar_section_${storageKey}`, next ? "1" : "0");
+      } catch {}
+    },
+    [storageKey],
+  );
+  return { open, setOpen };
 }
 
 export const Sidebar = memo(function Sidebar({
@@ -46,18 +57,18 @@ export const Sidebar = memo(function Sidebar({
   view,
   onSelectView,
   onAddChannel,
-  onCreatePlaylist,
+  onNewPlaylist,
   syncProgress,
   downloadProgress,
-  onMergeArtists,
   artistScopeTitle,
   onClearArtistScope,
-  mergingArtists,
+  searchQuery,
+  onSearchChange,
 }: SidebarProps) {
   const t = useT();
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
-  const submittedRef = useRef(false);
+  const channelsSection = useSection("channels");
+  const playlistsSection = useSection("playlists");
+  const artistsSection = useSection("artists");
   const coverSources = usePlaylistCoverSources();
   const [artistQuery, setArtistQuery] = useState("");
   const filteredArtists = useMemo(() => {
@@ -67,25 +78,40 @@ export const Sidebar = memo(function Sidebar({
   }, [artists, artistQuery]);
 
   const startCreating = () => {
-    submittedRef.current = false;
-    setCreating(true);
+    playlistsSection.setOpen(true);
+    onNewPlaylist();
   };
 
-  const submitNewPlaylist = () => {
-    if (submittedRef.current) return;
-    submittedRef.current = true;
-    const name = newName.trim();
-    if (name) onCreatePlaylist(name);
-    setNewName("");
-    setCreating(false);
+  const startAddingChannel = () => {
+    channelsSection.setOpen(true);
+    onAddChannel();
   };
 
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-name">fygram</span>
         <ProfileMenu />
+        <p className="brand-hint">
+          {t("Download music in the")}{" "}
+          <a
+            className="brand-hint-link"
+            href={BOT_URL}
+            onClick={(e) => {
+              e.preventDefault();
+              void openUrl(BOT_URL);
+            }}
+          >
+            @wwloadbot
+          </a>
+        </p>
       </div>
+
+      <SearchBox
+        className="sidebar-search-box"
+        placeholder={t("What do you want to play?")}
+        value={searchQuery}
+        onChange={onSearchChange}
+      />
 
       <nav className="nav-section">
         <button
@@ -100,9 +126,10 @@ export const Sidebar = memo(function Sidebar({
       <SidebarSection
         title={t("Channels")}
         count={channels.length}
-        storageKey="channels"
+        open={channelsSection.open}
+        onToggle={() => channelsSection.setOpen(!channelsSection.open)}
         action={
-          <button className="icon-btn" onClick={onAddChannel} title={t("Add channels")}>
+          <button className="icon-btn" onClick={startAddingChannel} title={t("Add channels")}>
             <PlusIcon size={15} />
           </button>
         }
@@ -126,35 +153,16 @@ export const Sidebar = memo(function Sidebar({
       <SidebarSection
         title={t("Playlists")}
         count={playlists.length}
-        storageKey="playlists"
+        open={playlistsSection.open}
+        onToggle={() => playlistsSection.setOpen(!playlistsSection.open)}
         action={
           <button className="icon-btn" onClick={startCreating} title={t("New playlist")}>
             <PlusIcon size={15} />
           </button>
         }
       >
-        {creating && (
-          <input
-            autoFocus
-            className="playlist-new-input"
-            placeholder={t("Playlist name…")}
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onBlur={submitNewPlaylist}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submitNewPlaylist();
-              if (e.key === "Escape") {
-                submittedRef.current = true;
-                setCreating(false);
-                setNewName("");
-              }
-            }}
-          />
-        )}
         <ul className="sidebar-list">
-          {playlists.length === 0 && !creating && (
-            <li className="empty-hint">{t("No playlists yet.")}</li>
-          )}
+          {playlists.length === 0 && <li className="empty-hint">{t("No playlists yet.")}</li>}
           {playlists.map((p) => {
             const dlProgress = downloadProgress[p.id];
             const downloading = dlProgress && !dlProgress.done;
@@ -165,9 +173,6 @@ export const Sidebar = memo(function Sidebar({
                   view.kind === "playlist" && view.playlistId === p.id ? "is-active" : ""
                 }`}
               >
-                {/* Selecting, and nothing else: renaming a playlist, changing
-                    its picture, downloading it and deleting it all live on the
-                    playlist's own page now. */}
                 <button
                   className="sidebar-list-main"
                   onClick={() => onSelectView({ kind: "playlist", playlistId: p.id })}
@@ -178,7 +183,7 @@ export const Sidebar = memo(function Sidebar({
                     cover={p.cover_path}
                     seed={p.id}
                     label={p.name}
-                    size={20}
+                    size={28}
                   />
                   <span className="truncate">{p.name}</span>
                 </button>
@@ -209,28 +214,22 @@ export const Sidebar = memo(function Sidebar({
       <SidebarSection
         title={t("Artists")}
         count={artists.length}
-        storageKey="artists"
+        open={artistsSection.open}
+        onToggle={() => artistsSection.setOpen(!artistsSection.open)}
+        titleNote={artistScopeTitle ?? undefined}
         action={
-          <button
-            className="icon-btn"
-            title={t("Merge similarly-spelled artist names (case, typos) into one")}
-            onClick={onMergeArtists}
-            disabled={mergingArtists}
-          >
-            <RefreshIcon size={13} className={mergingArtists ? "spin" : ""} />
-          </button>
+          artistScopeTitle ? (
+            <button
+              className="icon-btn"
+              onClick={onClearArtistScope}
+              title={t("Show artists from every channel")}
+              aria-label={t("Show artists from every channel")}
+            >
+              <CloseIcon size={13} />
+            </button>
+          ) : undefined
         }
       >
-        {artistScopeTitle && (
-          <button
-            className="artist-scope-chip"
-            onClick={onClearArtistScope}
-            title={t("Show artists from every channel")}
-          >
-            <span className="truncate">{artistScopeTitle}</span>
-            <CloseIcon size={11} />
-          </button>
-        )}
         {artists.length > 0 && (
           <SearchBox
             className="artist-search-box"
@@ -255,7 +254,13 @@ export const Sidebar = memo(function Sidebar({
                 className="sidebar-list-main"
                 onClick={() => onSelectView({ kind: "artist", artist: a.name })}
               >
-                <MusicNoteIcon size={14} />
+                <span
+                  className="sidebar-list-art sidebar-list-letter"
+                  style={{ background: avatarGradientCss(a.name) }}
+                  aria-hidden
+                >
+                  {initials(a.name === VARIOUS_ARTISTS_KEY ? t("Various artists") : a.name)}
+                </span>
                 <span className="truncate">
                   {a.name === VARIOUS_ARTISTS_KEY ? t("Various artists") : a.name}
                 </span>
@@ -271,45 +276,39 @@ export const Sidebar = memo(function Sidebar({
 
 function SidebarSection({
   title,
+  titleNote,
   count,
-  storageKey,
+  open,
+  onToggle,
   action,
   children,
 }: {
   title: string;
+  titleNote?: string;
   count?: number;
-  storageKey: string;
+  open: boolean;
+  onToggle: () => void;
   action?: ReactNode;
   children: ReactNode;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(
-    () => localStorage.getItem(`sidebar_section_${storageKey}`) === "1",
-  );
-
-  const toggle = () => {
-    setOpen((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(`sidebar_section_${storageKey}`, next ? "1" : "0");
-      } catch {
-        // a collapsed section that does not survive a restart is not a failure
-      }
-      return next;
-    });
-  };
 
   return (
     <div className={`sidebar-section ${open ? "is-open" : "is-closed"}`}>
       <div className="sidebar-section-header">
         <button
           className="sidebar-section-toggle"
-          onClick={toggle}
+          onClick={onToggle}
           aria-expanded={open}
           title={open ? t("Collapse") : t("Expand")}
         >
           <ChevronDownIcon size={12} className="sidebar-section-chevron" />
-          <span>{title}</span>
+          <span className="sidebar-section-name">{title}</span>
+          {titleNote && (
+            <span className="sidebar-section-scope truncate" title={titleNote}>
+              {titleNote}
+            </span>
+          )}
           {count !== undefined && count > 0 && (
             <span className="sidebar-section-count">{count}</span>
           )}
@@ -342,19 +341,20 @@ function SidebarChannelItem({
   const syncError = progress?.error;
   const downloading = dlProgress && !dlProgress.done;
 
-  const tint = useAmbientColor(c.avatar_path ?? null);
-
   return (
-    <li
-      className={`sidebar-list-item sidebar-channel-item ${isActive ? "is-active" : ""}`}
-      style={tint ? ({ "--channel-tint": `rgb(${tint})` } as CSSProperties) : undefined}
-    >
+    <li className={`sidebar-list-item sidebar-channel-item ${isActive ? "is-active" : ""}`}>
       <button
         className="sidebar-list-main"
         onClick={() => onSelectView({ kind: "channel", channelId: c.id })}
       >
         {c.avatar_path ? (
-          <UserAvatar className="channel-avatar" path={c.avatar_path} />
+          <UserAvatar
+            className="channel-avatar"
+            path={c.avatar_path}
+            fallback={
+              <span className="channel-avatar channel-avatar-fallback">{initials(c.title)}</span>
+            }
+          />
         ) : (
           <span className="channel-avatar channel-avatar-fallback">{initials(c.title)}</span>
         )}

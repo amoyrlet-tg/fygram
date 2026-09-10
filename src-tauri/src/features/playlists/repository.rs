@@ -1,5 +1,3 @@
-//! Every SQL statement the playlists feature runs.
-
 use chrono::Utc;
 use sqlx::SqlitePool;
 
@@ -7,7 +5,6 @@ use crate::features::sync::outbox;
 use crate::shared::error::AppError;
 use crate::shared::models::{Playlist, Track};
 
-// four tiles, but a track without artwork does not fill one
 const COVER_SOURCE_LIMIT: i64 = 6;
 
 pub(crate) async fn list(db: &SqlitePool) -> Result<Vec<Playlist>, AppError> {
@@ -205,8 +202,6 @@ pub(crate) async fn set_cover_path(
     Ok(())
 }
 
-/// The first few tracks of every playlist, for its fallback mosaic. One query
-/// rather than one per playlist: a sidebar draws them all at once.
 pub(crate) async fn cover_sources(db: &SqlitePool) -> Result<Vec<(String, String)>, AppError> {
     Ok(sqlx::query_as::<_, (String, String)>(
         "SELECT playlist_id, track_id FROM ( \
@@ -218,4 +213,19 @@ pub(crate) async fn cover_sources(db: &SqlitePool) -> Result<Vec<(String, String
     .bind(COVER_SOURCE_LIMIT)
     .fetch_all(db)
     .await?)
+}
+
+pub(crate) async fn recent_adds(
+    db: &SqlitePool,
+    hours: i64,
+) -> Result<Vec<(String, i64)>, AppError> {
+    let rows = sqlx::query_as::<_, (String, i64)>(
+        "SELECT playlist_id, COUNT(*) FROM playlist_tracks \
+         WHERE added_at >= datetime('now', ?) \
+         GROUP BY playlist_id",
+    )
+    .bind(format!("-{hours} hours"))
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
 }

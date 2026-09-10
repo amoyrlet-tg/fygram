@@ -1,5 +1,3 @@
-//! Every SQL statement the ingest pass runs.
-
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
@@ -127,8 +125,6 @@ pub(crate) async fn set_document_id(
     Ok(())
 }
 
-/// Written on every pass: a track whose message we replaced is no longer
-/// forwarded, and the row has to stop saying it is.
 pub(crate) async fn set_forward_info(
     db: &SqlitePool,
     track_id: &str,
@@ -146,7 +142,6 @@ pub(crate) async fn set_forward_info(
     Ok(())
 }
 
-/// `from` is None when the original author hid their account.
 pub(crate) struct Forward {
     pub(crate) from: Option<String>,
     pub(crate) at: DateTime<Utc>,

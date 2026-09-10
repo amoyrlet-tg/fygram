@@ -98,28 +98,35 @@ export function useArtists(allTracks: Track[], scopeChannelId: string | null) {
     [artistTrust, isTrustedArtist, trustedKeys],
   );
 
-  const artists = useMemo(() => {
+  const tracksByArtist = useMemo(() => {
     const { sourceTracks, infoByKey } = artistTrust;
     const displayFor = (root: string) => infoByKey.get(root)?.display ?? root;
-    const counts = new Map<string, number>();
+    const byArtist = new Map<string, Track[]>();
+    const push = (name: string, track: Track) => {
+      const list = byArtist.get(name);
+      if (list) list.push(track);
+      else byArtist.set(name, [track]);
+    };
     for (const t of sourceTracks) {
       const roots = rootsForTrack(t);
       if (roots.length > 0) {
-        for (const root of roots) {
-          const display = displayFor(root);
-          counts.set(display, (counts.get(display) ?? 0) + 1);
-        }
+        for (const root of roots) push(displayFor(root), t);
       } else {
-        counts.set(VARIOUS_ARTISTS_KEY, (counts.get(VARIOUS_ARTISTS_KEY) ?? 0) + 1);
+        push(VARIOUS_ARTISTS_KEY, t);
       }
     }
-
-    return Array.from(counts, ([name, count]) => ({ name, count })).sort((a, b) => {
-      if (a.name === VARIOUS_ARTISTS_KEY) return 1;
-      if (b.name === VARIOUS_ARTISTS_KEY) return -1;
-      return b.count - a.count || a.name.localeCompare(b.name);
-    });
+    return byArtist;
   }, [artistTrust, rootsForTrack]);
+
+  const artists = useMemo(
+    () =>
+      Array.from(tracksByArtist, ([name, list]) => ({ name, count: list.length })).sort((a, b) => {
+        if (a.name === VARIOUS_ARTISTS_KEY) return 1;
+        if (b.name === VARIOUS_ARTISTS_KEY) return -1;
+        return b.count - a.count || a.name.localeCompare(b.name);
+      }),
+    [tracksByArtist],
+  );
 
   const filterByArtist = useCallback(
     (tracks: Track[], artist: string) => {
@@ -134,5 +141,5 @@ export function useArtists(allTracks: Track[], scopeChannelId: string | null) {
     [artistTrust, rootsForTrack],
   );
 
-  return { artists, filterByArtist };
+  return { artists, tracksByArtist, filterByArtist };
 }

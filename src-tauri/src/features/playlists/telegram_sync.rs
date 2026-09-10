@@ -1,8 +1,3 @@
-//! Playlists as documents in Saved Messages.
-//!
-//! No server arbitrates between two machines, so every change carries a device
-//! stamp and a revision, and a delete leaves a tombstone rather than a gap.
-
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::path::Path;
@@ -121,8 +116,6 @@ impl From<TrackRow> for SyncTrack {
     }
 }
 
-/// A zip holding `playlist.json` and, when there is one, `cover.jpg`. It used
-/// to be the bare json and `unpack` still reads that; nothing writes it.
 const DOC_ENTRY: &str = "playlist.json";
 const COVER_ENTRY: &str = "cover.jpg";
 const ZIP_MAGIC: &[u8; 4] = b"PK\x03\x04";
@@ -140,7 +133,6 @@ fn pack(doc: &SyncDoc, cover: Option<&[u8]>) -> Result<Vec<u8>> {
     zip.write_all(&json).context("writing the playlist entry")?;
 
     if let Some(cover) = cover {
-        // already a JPEG: deflate would spend time to save nothing
         let stored: zip::write::FileOptions<'_, ()> =
             zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
         zip.start_file(COVER_ENTRY, stored)
@@ -155,7 +147,6 @@ fn unpack(bytes: &[u8]) -> Result<(SyncDoc, Option<Vec<u8>>)> {
     use std::io::Read;
 
     if !bytes.starts_with(ZIP_MAGIC) {
-        // a snapshot written before playlists could carry a picture
         return Ok((
             serde_json::from_slice(bytes).context("reading a bare playlist snapshot")?,
             None,
@@ -402,7 +393,6 @@ pub(crate) async fn pull_playlists(
     Ok(changed)
 }
 
-/// Returns the path to store on the row.
 async fn land_cover(media_root: &Path, playlist_id: &str, cover: Option<&[u8]>) -> Option<String> {
     let Some(bytes) = cover else {
         super::service::drop_covers(media_root, playlist_id, None).await;
@@ -632,7 +622,7 @@ mod tests {
             .connect("sqlite::memory:")
             .await
             .unwrap();
-        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        crate::shared::schema::ensure(&pool).await.unwrap();
         pool
     }
 
@@ -712,7 +702,6 @@ mod tests {
             .0
     }
 
-    /// Nothing is ever written into it.
     fn media_dir() -> std::path::PathBuf {
         std::env::temp_dir().join("fygram-playlist-tests")
     }
@@ -740,7 +729,6 @@ mod tests {
 
     #[test]
     fn snapshots_written_before_covers_are_still_read() {
-        // exactly what older versions uploaded: the bare json, no zip around it
         let json = serde_json::to_vec(&doc_named("legacy")).unwrap();
         let (doc, cover) = unpack(&json).unwrap();
         assert_eq!(doc.name, "legacy");

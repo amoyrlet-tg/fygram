@@ -1,9 +1,10 @@
 import { formatDuration, trackLabel } from "@/shared/lib/format";
+import { PlayerAddMenu } from "../PlayerAddMenu";
 import { Slider } from "@/shared/ui/Slider";
 import { usePlayerWithProgress } from "@/app/providers/PlayerProvider";
 import { useT } from "@/shared/i18n";
 import { avatarGradientCss } from "@/shared/lib/avatarColor";
-import { useTrackCover } from "@/features/tracks/useTrackCover";
+import { usePlayingCover } from "@/features/tracks/useTrackCover";
 import "../../player-chrome.css";
 import "./PlayerBar.css";
 import {
@@ -25,7 +26,7 @@ export function PlayerBar({ onOpenNowPlaying }: { onOpenNowPlaying?: () => void 
   const t = useT();
   const { current, isPlaying, position, volume, shuffle, repeat, fetchProgress, playbackError } =
     player;
-  const cover = useTrackCover(current?.id);
+  const cover = usePlayingCover(current?.id);
   const duration = current?.duration_sec ?? 0;
   const label = current ? trackLabel(current) : null;
 
@@ -47,7 +48,7 @@ export function PlayerBar({ onOpenNowPlaying }: { onOpenNowPlaying?: () => void 
               title={t("Now playing")}
             >
               {cover ? (
-                <img src={cover.src} alt="" decoding="async" />
+                <img src={cover.preview} alt="" decoding="async" />
               ) : (
                 <span>{label!.title.slice(0, 1).toUpperCase()}</span>
               )}
@@ -123,6 +124,7 @@ export function PlayerBar({ onOpenNowPlaying }: { onOpenNowPlaying?: () => void 
       </div>
 
       <div className="player-volume">
+        <PlayerAddMenu track={current} />
         <VolumeIcon size={16} muted />
         <Slider
           value={volumeToSlider(volume)}

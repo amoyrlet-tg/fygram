@@ -1,7 +1,3 @@
-//! Walking a channel's messages and turning the audio ones into rows.
-//!
-//! Not just an append: messages get deleted and edited upstream too.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -357,8 +353,6 @@ async fn ingest_message(
     Ok(IngestOutcome::Inserted(track_id))
 }
 
-/// Whether the message is a forward, and when the original was posted. The date
-/// is lost by replacing it, so it goes into the new caption.
 fn forward_of(message: &Message) -> Option<repository::Forward> {
     let tl::enums::MessageFwdHeader::Header(header) = message.forward_header()?;
     Some(repository::Forward {

@@ -3,8 +3,8 @@ import ReactDOM from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./app/App";
-import { DocsWindow } from "./features/docs/DocsWindow";
 import { keepTypingVisible } from "./shared/lib/keyboardInsets";
+import { trackKeyboardFocus } from "./shared/lib/focusRing";
 
 const savedTheme = localStorage.getItem("theme");
 if (savedTheme === "light" || savedTheme === "dark") {
@@ -50,9 +50,10 @@ window.addEventListener("keydown", (e) => {
 });
 
 keepTypingVisible();
-
-const isDocs = window.location.hash.startsWith("#/docs");
+trackKeyboardFocus();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>{isDocs ? <DocsWindow /> : <App />}</React.StrictMode>,
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
 );

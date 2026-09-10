@@ -1,6 +1,6 @@
 [package]
 name = "fygram"
-version = "0.6.0"
+version = "1.0.0"
 description = "your telegram channels, as a music library"
 authors = ["amoyrlet <amoyrlet@proton.me>"]
 edition = "2021"
@@ -9,7 +9,7 @@ repository = "https://github.com/amoyrlet-tg/fygram"
 
 [lib]
 name = "fygram_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -26,7 +26,7 @@ tokio = { version = "1", features = ["full"] }
 
 tokio-util = { version = "0.7.18", features = ["rt"] }
 
-sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "chrono", "uuid", "migrate"] }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "chrono", "uuid"] }
 
 grammers-client = { git = "https://codeberg.org/Lonami/grammers", branch = "master" }
 grammers-session = { git = "https://codeberg.org/Lonami/grammers", branch = "master", default-features = false, features = ["serde"] }
@@ -43,6 +43,8 @@ ffmpeg-next = { version = "8.1", default-features = false, features = [
     "codec",
     "format",
     "software-resampling",
+    # avatars arrive as video and are turned into a gif - see shared/animation.rs
+    "software-scaling",
     "static",
 ] }
 
@@ -60,19 +62,14 @@ flate2 = "1"
 tauri-plugin-dialog = "2"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
-# Cargo has no idea what "desktop" means, so the condition is spelled out.
-# Autostart, the single-instance guard and the lock file it uses are all notions
-# that only exist where there is a desktop session to start into.
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 fd-lock = "4.0.4"
 dirs = "6.0.0"
 
-# Only reached from JNI_OnLoad - see src/android.rs.
-[target.'cfg(target_os = "android")'.dependencies]
-jni = "0.21"
-ndk-context = "0.1"
+[target.'cfg(unix)'.dependencies]
+# only for statvfs: how big the disk the library sits on actually is
+libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
@@ -87,10 +84,10 @@ windows = { version = "0.62", features = [
     "Win32_System_Threading",
     "Win32_System_ProcessStatus",
     "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Storage_FileSystem",
 ] }
 
-# What ships. `strip` is the big one on Android: the debug APK carried a
-# 500 MB library's worth of symbols, and none of it is any use on a phone.
+# What ships.
 [profile.release]
 opt-level = 3
 lto = "thin"

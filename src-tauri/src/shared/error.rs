@@ -1,6 +1,3 @@
-//! The backend's error type. `commands.rs` is the only place it becomes a
-//! string.
-
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum AppError {
     #[error(transparent)]

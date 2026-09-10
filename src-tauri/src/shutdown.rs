@@ -1,6 +1,3 @@
-//! Letting the app finish what it started. `spawn_tracked` is how background
-//! work asks to be waited for.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 

@@ -6,6 +6,19 @@
   max-width: 100%;
 }
 
+.track-title,
+.track-artist,
+.track-source,
+.track-table .col-added,
+.track-table .col-duration {
+  user-select: text;
+  -webkit-user-select: text;
+}
+.track-title,
+.track-artist {
+  cursor: text;
+}
+
 .drag-handle {
   background: transparent;
   border: none;
@@ -18,10 +31,6 @@
   border-radius: var(--radius-sm);
   cursor: grab;
   opacity: 0;
-  transition:
-    opacity 0.12s ease,
-    color 0.15s ease,
-    background 0.15s ease;
 
   touch-action: none;
 }
@@ -44,15 +53,10 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition:
-    background 0.15s ease-out,
-    color 0.15s ease-out,
-    transform 0.15s var(--ease-out);
 }
 .row-play-btn:hover {
   background: color-mix(in srgb, var(--blue) 16%, transparent);
   color: var(--text);
-  transform: scale(1.08);
 }
 
 .row-eq {
@@ -97,11 +101,10 @@ tr:hover .row-eq {
 tr:hover .row-eq + .row-play-icon {
   display: inline-flex;
 }
-@media (prefers-reduced-motion: reduce) {
-  .row-eq i {
-    animation: none;
-  }
-}
+/*
+ * No reduced-motion opt-out: the bounce is what says "this row is the one playing", and
+ * the desktop here runs with animations off, which WebKitGTK reports as reduce.
+ */
 
 .track-cell {
   display: flex;
@@ -154,11 +157,10 @@ tr:hover .row-eq + .row-play-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* white on the accent wash, the way the profile avatar does it - the dark
-     placeholder colour turned every thumbnail muddy */
+
   color: #fff;
   font-weight: 700;
-  /* 39% of the box, the proportion telegram uses for an empty avatar */
+
   font-size: 14px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
 }
@@ -173,14 +175,11 @@ tr:hover .row-eq + .row-play-icon {
   min-width: 0;
   flex: 1;
   background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text);
   font-size: 12.5px;
   padding: 4px 6px;
-}
-.track-edit-input:focus {
-  outline: 1px solid var(--accent);
 }
 .track-edit-saving {
   font-size: 12px;
@@ -201,9 +200,7 @@ tr:hover .row-eq + .row-play-icon {
   position: fixed;
   z-index: 231;
   background: var(--bg-elevated-2);
-  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  box-shadow: var(--overlay-shadow), var(--shadow-lg);
   width: 220px;
   max-height: 280px;
   display: flex;
@@ -215,7 +212,7 @@ tr:hover .row-eq + .row-play-icon {
   padding: 8px 10px 6px;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-faint);
 }
@@ -237,7 +234,6 @@ tr:hover .row-eq + .row-play-icon {
   padding: 9px 10px;
   border-radius: var(--radius-sm);
   font-size: 13.5px;
-  transition: background 0.12s ease;
 }
 .row-menu-item svg {
   flex: 0 0 auto;

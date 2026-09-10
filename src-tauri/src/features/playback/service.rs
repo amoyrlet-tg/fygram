@@ -1,12 +1,58 @@
-//! Getting a track ready to play - which mostly means making sure its bytes are on disk first.
-
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::features::library::media;
 use crate::shared::error::AppError;
 use crate::shared::media_paths;
 use crate::shared::models::Track;
+use crate::shared::settings;
 use crate::AppState;
+
+pub(crate) const OUTPUT_DEVICE_KEY: &str = "audio_output_device";
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct AudioOutputs {
+    pub(crate) devices: Vec<String>,
+    pub(crate) selected: Option<String>,
+}
+
+pub(crate) async fn audio_outputs(state: State<'_, AppState>) -> Result<AudioOutputs, AppError> {
+    let selected = settings::get(&state.db, OUTPUT_DEVICE_KEY)
+        .await?
+        .filter(|name| !name.is_empty());
+    let devices = tokio::task::spawn_blocking(super::audio::output_devices)
+        .await
+        .unwrap_or_default();
+    Ok(AudioOutputs { devices, selected })
+}
+
+pub(crate) async fn set_audio_output(
+    state: State<'_, AppState>,
+    device: Option<String>,
+) -> Result<(), AppError> {
+    let device = device.filter(|name| !name.is_empty());
+    settings::set(
+        &state.db,
+        OUTPUT_DEVICE_KEY,
+        device.as_deref().unwrap_or_default(),
+    )
+    .await?;
+    state.player.set_device(device);
+    Ok(())
+}
+
+pub(crate) async fn restore_audio_output(
+    db: &sqlx::SqlitePool,
+    player: &super::audio::PlayerHandle,
+) {
+    let saved = settings::get(db, OUTPUT_DEVICE_KEY)
+        .await
+        .ok()
+        .flatten()
+        .filter(|name| !name.is_empty());
+    if saved.is_some() {
+        player.set_device(saved);
+    }
+}
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct TrackFetchProgress {
@@ -63,9 +109,6 @@ pub(crate) async fn play(
         .map_err(|e| AppError::Msg(e.to_string()))?
         .map_err(AppError::Msg)?;
 
-    #[cfg(target_os = "android")]
-    announce_to_the_shade(&state, &app, &track).await;
-
     sqlx::query("UPDATE tracks SET play_count = play_count + 1 WHERE id = ?")
         .bind(&track_id)
         .execute(&state.db)
@@ -104,25 +147,4 @@ pub(crate) fn spawn_prefetch(app: AppHandle, track_id: String) {
             crate::log!("prefetch_track({track_id}) failed: {err:#}");
         }
     });
-}
-
-/// Feeds the card in the notification shade and on the lock screen.
-#[cfg(target_os = "android")]
-async fn announce_to_the_shade(state: &State<'_, AppState>, app: &AppHandle, track: &Track) {
-    let cover = match media_paths::media_root(app, &state.db).await {
-        Ok(dir) => media::covers::ensure_cover(&state.db, &dir, &track.id)
-            .await
-            .ok()
-            .flatten()
-            .map(|cover| cover.path),
-        Err(_) => None,
-    };
-    crate::android::now_playing(
-        track.title.as_deref().unwrap_or("fygram"),
-        track.artist.as_deref().unwrap_or(""),
-        cover.as_deref(),
-        track.duration_sec.unwrap_or(0).max(0) * 1000,
-        0,
-        true,
-    );
 }

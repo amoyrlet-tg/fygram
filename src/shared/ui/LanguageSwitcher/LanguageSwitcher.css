@@ -10,35 +10,27 @@
   height: 26px;
   padding: 0;
   background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 999px;
   cursor: pointer;
-  transition:
-    border-color var(--duration-shortest) ease,
-    transform var(--duration-shortest) ease;
 }
 .lang-switch-trigger:hover,
 .lang-switch-trigger.is-open {
-  border-color: var(--accent);
+  background: var(--bg-hover);
 }
 .lang-switch-trigger .lang-flag {
   width: 15px;
   height: auto;
   border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .lang-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 172px;
-  max-height: 260px;
+  position: fixed;
+  z-index: 200;
   overflow-y: auto;
-  background: var(--bg-elevated-2);
-  border: 1px solid var(--border);
+  overscroll-behavior: contain;
+  background: color-mix(in srgb, var(--accent-base) 18%, var(--bg-elevated-2));
   border-radius: var(--radius-md);
-  box-shadow: var(--overlay-shadow), var(--shadow-lg);
   padding: 5px;
   display: flex;
   flex-direction: column;
@@ -84,7 +76,6 @@
   height: auto;
   flex-shrink: 0;
   border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 .lang-option-native {
   flex: 1;
@@ -101,10 +92,9 @@
   padding: 7px 12px;
   border-radius: var(--radius-pill);
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
 }
 .lang-switch-trigger.has-label:hover {
-  border-color: var(--border-strong);
+  background: var(--bg-hover);
 }
 .lang-switch-name {
   font-size: 12px;

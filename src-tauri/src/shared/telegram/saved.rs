@@ -1,5 +1,3 @@
-//! Saved Messages, used as the user's own storage.
-
 use std::path::Path;
 
 use anyhow::Result;
@@ -11,13 +9,29 @@ use grammers_session::types::PeerRef;
 use super::TelegramState;
 
 pub(crate) struct SavedMusic {
-    pub(crate) document_id: i64,
     pub(crate) input: tl::enums::InputDocument,
+    pub(crate) document_id: i64,
+    pub(crate) title: Option<String>,
+    pub(crate) performer: Option<String>,
+    pub(crate) duration_sec: Option<i32>,
+}
+
+fn audio_attributes(
+    document: &tl::types::Document,
+) -> (Option<String>, Option<String>, Option<i32>) {
+    for attribute in &document.attributes {
+        if let tl::enums::DocumentAttribute::Audio(audio) = attribute {
+            return (
+                audio.title.clone(),
+                audio.performer.clone(),
+                Some(audio.duration),
+            );
+        }
+    }
+    (None, None, None)
 }
 
 impl TelegramState {
-    /// Newest first, first pages only - past a few hundred entries the
-    /// position is not worth the round trips.
     pub(crate) async fn saved_music(&self, max: usize) -> Result<Vec<SavedMusic>> {
         let client = self.client().await?;
         let mut out = Vec::new();
@@ -43,13 +57,17 @@ impl TelegramState {
                 let tl::enums::Document::Document(d) = doc else {
                     continue;
                 };
+                let (title, performer, duration_sec) = audio_attributes(&d);
                 out.push(SavedMusic {
-                    document_id: d.id,
                     input: tl::enums::InputDocument::Document(tl::types::InputDocument {
                         id: d.id,
                         access_hash: d.access_hash,
                         file_reference: d.file_reference,
                     }),
+                    document_id: d.id,
+                    title,
+                    performer,
+                    duration_sec,
                 });
             }
             offset += page_len as i32;
@@ -60,8 +78,6 @@ impl TelegramState {
         Ok(out)
     }
 
-    /// After `after`, or first when None. Re-saving something already there
-    /// moves it rather than duplicating it.
     pub(crate) async fn place_saved_music(
         &self,
         id: tl::enums::InputDocument,

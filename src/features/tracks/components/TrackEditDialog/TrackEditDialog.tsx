@@ -11,8 +11,6 @@ import { useModalClose } from "@/shared/hooks/useModalClose";
 import { CloseIcon, EditIcon } from "@/shared/ui/icons";
 import "./TrackEditDialog.css";
 
-/** A forwarded message cannot be edited, so the same dialog can send a repost
- *  instead - the same fields, plus what the new message says. */
 export type TrackEdit = {
   title: string | null;
   artist: string | null;
@@ -20,8 +18,6 @@ export type TrackEdit = {
   repost?: { caption: string; deleteOriginal: boolean };
 };
 
-/** English and UTC on purpose: this goes into a public channel, and it is the
- *  only trace left of the original once it is deleted. */
 function originalDateLine(track: Track): string {
   const iso = track.forwarded_at ?? track.published_at;
   if (!iso) return "";
@@ -64,14 +60,11 @@ export function TrackEditDialog({
   const [coverPath, setCoverPath] = useState<string | null>(null);
   const [pickError, setPickError] = useState<string | null>(null);
 
-  // Telegram will not edit a forward at all, so the repair is a new message
   const isForward = track.forwarded === true;
   const defaultCaption = originalDateLine(track);
   const [caption, setCaption] = useState(defaultCaption);
   const [deleteOriginal, setDeleteOriginal] = useState(true);
 
-  // a refused edit is how the app learns a message was forwarded, and the
-  // original's date arrives with it - so the proposed line changes under us
   const [proposed, setProposed] = useState(defaultCaption);
   if (proposed !== defaultCaption) {
     setProposed(defaultCaption);
@@ -80,7 +73,6 @@ export function TrackEditDialog({
 
   const toggleDelete = (next: boolean) => {
     setDeleteOriginal(next);
-    // only ever overwrites the line this dialog wrote itself
     setCaption((current) => {
       if (next) return current === "" ? defaultCaption : current;
       return current === defaultCaption ? "" : current;
@@ -91,7 +83,6 @@ export function TrackEditDialog({
     try {
       const picked = await open({
         multiple: false,
-        // exactly the decoders the backend is built with - see Cargo.toml
         filters: [{ name: t("Images"), extensions: ["jpg", "jpeg", "png", "webp", "gif"] }],
       });
       if (typeof picked === "string") {
@@ -99,7 +90,6 @@ export function TrackEditDialog({
         setPickError(null);
       }
     } catch (err) {
-      // silence here is indistinguishable from a dismissed dialog
       setPickError(String(err));
     }
   };
@@ -132,7 +122,6 @@ export function TrackEditDialog({
         <div className="modal-body track-edit-body">
           <div className="track-edit-cover-row">
             {coverPath ? (
-              // the picker put this path into the asset scope
               <img className="track-edit-cover" src={convertFileSrc(coverPath)} alt="" />
             ) : cover ? (
               <img className="track-edit-cover" src={cover.src} alt="" />

@@ -44,9 +44,6 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition:
-    color var(--duration-shortest) ease,
-    background var(--duration-shortest) ease;
 }
 .password-reveal:hover {
   color: var(--text);

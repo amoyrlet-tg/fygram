@@ -1,5 +1,3 @@
-//! The loop that watches the probe and steps our own volume down while a Telegram client is playing.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;

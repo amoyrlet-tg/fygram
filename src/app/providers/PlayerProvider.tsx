@@ -1,10 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { usePlayer, type PlayerApi } from "@/features/player/usePlayer";
 
-/**
- * Split in two on purpose: `position` ticks four times a second, and only the
- * three components drawing a progress bar should re-render with it.
- */
 export type PlayerProgress = Pick<PlayerApi, "position" | "fetchProgress">;
 export type PlayerControls = Omit<PlayerApi, "position" | "fetchProgress">;
 
@@ -96,21 +92,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Everything about the player except how far into the track it is. */
 export function usePlayerApi(): PlayerControls {
   const value = useContext(ControlsContext);
   if (!value) throw new Error("usePlayerApi must be used inside <PlayerProvider>");
   return value;
 }
 
-/** How far into the track it is. Re-renders on every tick - use it sparingly. */
 export function usePlayerProgress(): PlayerProgress {
   const value = useContext(ProgressContext);
   if (!value) throw new Error("usePlayerProgress must be used inside <PlayerProvider>");
   return value;
 }
 
-/** For the three components that actually draw a progress bar. */
 export function usePlayerWithProgress(): PlayerApi {
   const controls = usePlayerApi();
   const progress = usePlayerProgress();

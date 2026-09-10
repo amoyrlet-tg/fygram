@@ -1,6 +1,6 @@
 .track-view {
   --pin-h: 56px;
-  --pin-head-h: 34px;
+  --pin-head-h: 36px;
 
   position: relative;
   display: flex;
@@ -15,78 +15,49 @@
   position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 28px;
+  gap: var(--spacing-looser);
 
-  margin: 0 0 var(--spacing-base);
-  padding: 44px 28px 26px;
+  margin: 0;
+  padding: var(--spacing-base) var(--content-pad);
   flex: 0 0 auto;
 
   overflow: visible;
 }
-.channel-hero::before {
-  content: "";
-  position: absolute;
 
-  inset: 0 0 -120px 0;
-  z-index: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--channel-tint, var(--accent-base)) 72%, transparent) 0%,
-    color-mix(in srgb, var(--channel-tint, var(--accent-base)) 45%, transparent) 26%,
-    color-mix(in srgb, var(--channel-tint, var(--accent-base)) 22%, transparent) 50%,
-    color-mix(in srgb, var(--channel-tint, var(--accent-base)) 8%, transparent) 72%,
-    transparent 100%
-  );
-  transition: background 0.6s ease;
-}
-
-.channel-hero::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg, transparent 30%, rgba(0, 0, 0, 0.18) 100%);
-}
-:root[data-theme="light"] .channel-hero::after {
-  background: linear-gradient(180deg, transparent 30%, rgba(255, 255, 255, 0.25) 100%);
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .channel-hero::after {
-    background: linear-gradient(180deg, transparent 30%, rgba(255, 255, 255, 0.25) 100%);
-  }
-}
 .channel-hero-art {
   position: relative;
   z-index: 1;
-  width: 148px;
-  height: 148px;
+  width: var(--art-hero);
+  height: var(--art-hero);
   flex-shrink: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: var(--shadow-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--placeholder-bg);
   color: var(--placeholder-fg);
   font-weight: 800;
-  font-size: 60px;
+  font-size: 72px;
 }
 .channel-hero-art img,
-.channel-hero-art video {
+.channel-hero-art video,
+.channel-hero-art > span {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
-}
-/* Fills .channel-hero-art, which already provides the corners and the shadow. */
-.channel-hero-mosaic {
-  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
 }
 
-/* The picture is the control: clicking it is how a playlist gets a new one. */
+.channel-hero-mosaic {
+  border-radius: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .channel-hero-art-pick {
   display: block;
   width: 100%;
@@ -113,14 +84,14 @@
 }
 .channel-hero-art-clear {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 8px;
+  right: 8px;
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   border-radius: var(--radius-pill);
@@ -137,20 +108,15 @@
 
 .channel-hero-rename {
   font: inherit;
-  font-size: 44px;
+  font-size: clamp(28px, 3.4vw, 44px);
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--text);
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  border: none;
   border-radius: var(--radius-sm);
   padding: 2px 10px;
   max-width: 100%;
-}
-
-.hero-shuffle-btn.is-danger:hover {
-  color: var(--danger, #ef4444);
-  border-color: color-mix(in srgb, var(--danger, #ef4444) 45%, transparent);
 }
 
 .channel-hero-text {
@@ -158,22 +124,24 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
+  padding: 0 var(--window-controls-width) 4px 0;
 }
 .channel-hero-label {
-  font-size: 11.5px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--text-dim);
 }
 .channel-hero-text h1 {
-  font-size: clamp(30px, 4.5vw, 52px);
+  font-size: clamp(30px, 4.4vw, 56px);
   font-weight: 800;
   margin: 0;
-  letter-spacing: -0.025em;
-  line-height: 1.05;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
 
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -195,61 +163,87 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--accent-yellow);
-  background: color-mix(in srgb, var(--accent-yellow) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-yellow) 28%, transparent);
+  background: color-mix(in srgb, var(--accent-yellow) 16%, transparent);
+}
+
+.channel-hero-bar {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  padding: 0 var(--content-pad) var(--spacing-looser);
+}
+
+/*
+ * Hairlines seaming the three bands of a channel: the artwork and title, the actions
+ * under it, and the list. They stop at the content padding and fade out at both ends,
+ * so each one reads as a seam between bands rather than as the border of a box.
+ * Only drawn under a hero, which is the only case where there are bands to separate.
+ */
+.channel-hero + .channel-hero-bar {
+  padding-top: var(--spacing-base);
+}
+.channel-hero + .channel-hero-bar::before,
+.channel-hero + .channel-hero-bar::after {
+  content: "";
+  position: absolute;
+  left: var(--content-pad);
+  right: var(--content-pad);
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0,
+    var(--border) 7%,
+    var(--border) 93%,
+    transparent 100%
+  );
+}
+.channel-hero + .channel-hero-bar::before {
+  top: 0;
+}
+.channel-hero + .channel-hero-bar::after {
+  bottom: 0;
 }
 
 .channel-hero-actions {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: var(--spacing-tighter);
 }
 
 .hero-play-btn {
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: none;
-  background: var(--channel-tint, var(--blue));
+  background: var(--blue);
   color: #000;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  transition:
-    transform 0.12s ease,
-    background 0.18s ease;
 }
 .hero-play-btn:hover {
-  background: color-mix(in srgb, var(--channel-tint, var(--blue)) 84%, white);
-  transform: scale(1.05);
-}
-.hero-play-btn:active {
-  transform: scale(0.96);
+  background: var(--blue-hover);
 }
 .hero-shuffle-btn {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--text) 30%, transparent);
+  border: none;
   background: transparent;
-  color: var(--text);
+  color: color-mix(in srgb, var(--text) 66%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition:
-    transform 0.12s ease,
-    border-color 0.18s ease,
-    background 0.18s ease;
 }
 .hero-shuffle-btn:hover {
-  border-color: var(--text);
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-  transform: scale(1.05);
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
 }
-.hero-shuffle-btn:active {
-  transform: scale(0.96);
+.hero-shuffle-btn.is-danger:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 
 .track-view-header {
@@ -259,32 +253,26 @@
 
   flex-wrap: wrap;
   gap: 14px 24px;
-  padding: 24px 28px 0;
+  padding: var(--spacing-looser) var(--content-pad) 0;
   margin-bottom: 14px;
   flex: 0 0 auto;
 }
 
 .channel-hero + .track-view-header {
-  padding-top: 0;
+  padding: 0;
+  margin: 0;
 }
 
 .track-view-heading {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 
   flex: 1 1 auto;
 }
-.track-view-count {
-  color: var(--text-faint);
-  font-size: 13px;
-  font-weight: 600;
-
-  white-space: nowrap;
-}
 .track-view-header h1 {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 800;
   margin: 0;
   letter-spacing: -0.025em;
@@ -293,30 +281,40 @@
   overflow-wrap: anywhere;
 }
 .track-view-count {
+  white-space: nowrap;
   padding: 3px 9px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent-base) 12%, transparent);
   color: color-mix(in srgb, var(--accent-base) 85%, var(--text));
-}
-
-.track-view-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  flex: 1 1 auto;
-  justify-content: flex-end;
-  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .empty-state {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 80px 0;
+  gap: var(--spacing-base);
+  padding: var(--spacing-looser-3) var(--content-pad);
   color: var(--text-faint);
+}
+.empty-state-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text-dim);
+}
+.empty-state-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-dim);
 }
 
 .track-view-pin {
@@ -331,7 +329,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-tighter);
-  padding: 0 28px;
+  padding: 0 var(--window-controls-width) 0 var(--content-pad);
   box-sizing: border-box;
 }
 .track-view-pin.is-pinned {
@@ -346,13 +344,6 @@
   top: 0;
   height: calc(var(--pin-h) + var(--pin-head-h));
   background-color: color-mix(in srgb, var(--bg-elevated) 88%, var(--bg));
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--channel-tint, var(--accent-base)) 22%, transparent) 0%,
-    color-mix(in srgb, var(--channel-tint, var(--accent-base)) 8%, transparent) 58%,
-    transparent 100%
-  );
-  box-shadow: 0 14px 28px -22px rgba(0, 0, 0, 0.9);
   opacity: 0;
   transition: opacity var(--duration-shortest) ease;
 }
@@ -365,6 +356,7 @@
 }
 .track-view-pin.is-pinned::before {
   opacity: 1;
+  box-shadow: inset 0 -1px 0 var(--border);
   transition: opacity var(--duration-base) var(--ease-out);
 }
 
@@ -414,9 +406,6 @@
   color: var(--placeholder-fg);
   font-size: 15px;
   font-weight: 800;
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.35),
-    0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent);
   transform: scale(0.7);
   transition: transform var(--duration-shortest) ease;
 }
@@ -459,25 +448,20 @@
 }
 
 .track-view-pin-play {
-  margin-left: auto;
+  order: -1;
   flex: 0 0 auto;
   width: 34px;
   height: 34px;
   border-radius: 50%;
   border: none;
-  background: var(--channel-tint, var(--blue));
+  background: var(--blue);
   color: #000;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--channel-tint, var(--blue)) 80%, transparent);
 }
 .track-view-pin.is-pinned .track-view-pin-play:hover {
-  background: color-mix(in srgb, var(--channel-tint, var(--blue)) 84%, white);
-  transform: scale(1.07);
-}
-.track-view-pin.is-pinned .track-view-pin-play:active {
-  transform: scale(0.95);
+  background: var(--blue-hover);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -491,7 +475,7 @@
 
 .track-table-scroll {
   width: 100%;
-  padding: 0 28px 24px;
+  padding: 0 var(--content-pad);
   box-sizing: border-box;
 }
 
@@ -500,48 +484,61 @@
   min-width: 100%;
 
   border-collapse: separate;
-  border-spacing: 0 3px;
-  margin-top: -3px;
+  border-spacing: 0 var(--row-gap);
+  margin-top: calc(-1 * var(--row-gap));
 
   table-layout: fixed;
 }
 .track-table thead th {
   text-align: left;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-faint);
   height: var(--pin-head-h);
-  padding: 0 12px 12px;
+  padding: 0 12px 10px;
   vertical-align: bottom;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 
   position: sticky;
   top: var(--pin-h);
   background: transparent;
   z-index: 4;
 }
+
+.track-table .col-drag {
+  width: 32px;
+}
 .track-table .col-num {
-  width: 28px;
+  width: 40px;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: 12.5px;
+}
+.track-table thead th.col-num {
+  text-align: right;
+  padding-right: 12px;
 }
 .track-table .col-index {
-  width: 36px;
+  width: 40px;
+}
+.track-table .col-added {
+  width: 128px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
 }
 .track-table .col-duration {
-  width: 128px;
+  width: 84px;
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .track-table thead th.col-duration {
   text-align: right;
 }
-
 .track-table .col-actions {
-  width: 112px;
+  width: 96px;
 }
 .track-table td.col-actions {
   white-space: nowrap;
@@ -556,9 +553,6 @@
 .track-table tbody tr.is-current td.col-actions .icon-btn {
   opacity: 1;
 }
-.track-table .col-drag {
-  width: 26px;
-}
 
 .track-table-reorderable tbody tr:hover .drag-handle,
 .track-table-reorderable tbody tr.is-dragging .drag-handle {
@@ -566,34 +560,18 @@
 }
 .track-table tbody tr.is-dragging {
   background: var(--bg-elevated-2);
-  box-shadow: var(--shadow-lg);
 }
 .track-table tbody tr.is-dragging td {
   background: transparent;
 }
-
-.track-table tbody tr {
-  transition: background var(--duration-shortest) ease;
-}
 .track-table tbody tr:hover {
-  background: var(--bg-hover);
-}
-.track-table tbody td:first-child {
-  border-top-left-radius: var(--radius-md);
-  border-bottom-left-radius: var(--radius-md);
-}
-.track-table tbody td:last-child {
-  border-top-right-radius: var(--radius-md);
-  border-bottom-right-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
 }
 .track-table tbody tr.is-current {
   background: linear-gradient(90deg, var(--blue-soft) 0%, transparent 65%);
 }
 .track-table tbody tr.is-current .track-title {
   color: var(--blue);
-}
-.track-table tbody tr.is-current .track-thumbnail {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--blue) 60%, transparent);
 }
 
 .track-table tbody tr.is-unavailable .track-title {
@@ -610,144 +588,43 @@
   content: "";
   position: absolute;
   left: 0;
-  top: 4px;
-  bottom: 4px;
-  width: 2px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
   border-radius: 2px;
   background: var(--stripe);
 }
+
 .track-table td {
-  height: 50px;
+  height: var(--row-h);
   box-sizing: border-box;
   padding: 0 12px;
   vertical-align: middle;
 }
-
-.track-table td:first-child {
+.track-table tbody td:first-child {
   border-top-left-radius: var(--radius-sm);
   border-bottom-left-radius: var(--radius-sm);
 }
-.track-table td:last-child {
+.track-table tbody td:last-child {
   border-top-right-radius: var(--radius-sm);
   border-bottom-right-radius: var(--radius-sm);
-}
-.track-table .col-duration {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 
 .track-table tbody tr.is-current .row-play-btn {
   color: var(--blue);
 }
 
-.mobile-main .track-view-header,
-.mobile-search-body .track-view-header {
-  display: none;
+@media (max-width: 1180px) {
+  .track-table .col-added {
+    width: 104px;
+  }
 }
-.mobile-main .track-view,
-.mobile-search-body .track-view {
-  flex: 1;
-  min-height: 0;
-
-  -webkit-overflow-scrolling: touch;
-}
-.mobile-main .channel-hero {
-  margin: 0 0 10px;
-  padding: 10px 16px 12px;
-  gap: 12px;
-
-  align-items: flex-start;
-}
-
-.mobile-search-body .channel-hero {
-  display: none;
-}
-
-.mobile-main-under-overlay .channel-hero {
-  padding-top: calc(var(--safe-top) + 10px);
-}
-.mobile-main-under-overlay .channel-hero-text {
-  padding-right: 40px;
-}
-.mobile-main .channel-hero-rename {
-  font-size: 22px;
-  padding: 2px 6px;
-}
-/* The row would otherwise push the delete button off a phone's screen. */
-.mobile-main .channel-hero-readonly {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  align-self: flex-start;
-  padding: 3px 9px 3px 7px;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-yellow);
-  background: color-mix(in srgb, var(--accent-yellow) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-yellow) 28%, transparent);
-}
-
-.channel-hero-actions {
-  flex-wrap: wrap;
-}
-.mobile-main .channel-hero-art {
-  width: 92px;
-  height: 92px;
-  font-size: 34px;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-lg);
-}
-.mobile-main .channel-hero-text h1 {
-  font-size: 23px;
-}
-.mobile-main .hero-play-btn {
-  width: 42px;
-  height: 42px;
-}
-.mobile-main .hero-shuffle-btn {
-  width: 34px;
-  height: 34px;
-}
-.mobile-main .track-table-scroll,
-.mobile-search-body .track-table-scroll {
-  padding: 0 12px 12px;
-}
-.mobile-main .track-table thead,
-.mobile-search-body .track-table thead {
-  display: none;
-}
-.mobile-main .track-view,
-.mobile-search-body .track-view {
-  --pin-h: 50px;
-  --pin-head-h: 0px;
-}
-.mobile-main .track-view-pin,
-.mobile-search-body .track-view-pin {
-  padding: 0 16px;
-}
-.mobile-main .track-view-pin-art,
-.mobile-search-body .track-view-pin-art {
-  width: 30px;
-  height: 30px;
-  font-size: 13px;
-}
-.mobile-main .track-view-pin-play,
-.mobile-search-body .track-view-pin-play {
-  width: 30px;
-  height: 30px;
-}
-
-.mobile-main .track-table .col-duration,
-.mobile-search-body .track-table .col-duration {
-  width: 56px;
-}
-.mobile-main .track-table .col-actions,
-.mobile-search-body .track-table .col-actions {
-  width: 88px;
-}
-
-.mobile-main .track-table-reorderable tbody tr .drag-handle,
-.mobile-search-body .track-table-reorderable tbody tr .drag-handle {
-  opacity: 1;
+@media (max-width: 980px) {
+  .track-view {
+    --content-pad: var(--spacing-base);
+  }
+  .channel-hero {
+    --art-hero: 148px;
+    gap: var(--spacing-base);
+  }
 }

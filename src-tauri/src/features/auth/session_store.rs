@@ -1,8 +1,3 @@
-//! Telegram's session as a file.
-//!
-//! Temp file plus a backup: a session truncated by a power cut costs a fresh
-//! login, and the client rewrites it often.
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -92,10 +87,6 @@ fn peer_info_id(info: &PeerInfo) -> Option<PeerId> {
     }
 }
 
-/// Drops a session and the backup beside it.
-///
-/// Both: the restore path would otherwise bring the stale auth key back, and
-/// telegram answers AUTH_RESTART to every sign-in that uses one.
 pub(crate) fn forget(path: &Path) {
     let _ = std::fs::remove_file(path);
     let _ = std::fs::remove_file(backup_path(path));

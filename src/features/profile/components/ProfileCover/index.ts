@@ -1,0 +1,1 @@
+export { ProfileCover } from "./ProfileCover";

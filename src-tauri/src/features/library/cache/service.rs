@@ -1,5 +1,3 @@
-//! Measuring the library on disk and deciding what a cleanup takes with it.
-
 use tauri::{AppHandle, Emitter, State};
 
 use crate::shared::error::AppError;
@@ -36,6 +34,76 @@ pub(crate) struct CacheStats {
 
     pub(crate) orphaned_bytes: u64,
     pub(crate) orphaned_files: u32,
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct StorageSlice {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) avatar_path: Option<String>,
+    pub(crate) bytes: u64,
+    pub(crate) tracks: u32,
+}
+
+pub(crate) async fn breakdown(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Vec<StorageSlice>, AppError> {
+    let owned = repository::files_by_channel(&state.db).await?;
+
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    let mut by_channel: std::collections::HashMap<&str, StorageSlice> =
+        std::collections::HashMap::new();
+    for file in &owned {
+        if !seen.insert(file.file_path.as_str()) {
+            continue;
+        }
+        let Ok(meta) = tokio::fs::metadata(&file.file_path).await else {
+            continue;
+        };
+        let slice = by_channel
+            .entry(file.channel_id.as_str())
+            .or_insert_with(|| StorageSlice {
+                id: file.channel_id.clone(),
+                title: file.title.clone(),
+                avatar_path: file.avatar_path.clone(),
+                bytes: 0,
+                tracks: 0,
+            });
+        slice.bytes += meta.len();
+        slice.tracks += 1;
+    }
+
+    let mut slices: Vec<StorageSlice> = by_channel.into_values().collect();
+    slices.sort_by_key(|slice| std::cmp::Reverse(slice.bytes));
+
+    let stats = stats(state, app).await?;
+    if stats.orphaned_bytes > 0 {
+        slices.push(StorageSlice {
+            id: String::new(),
+            title: String::new(),
+            avatar_path: None,
+            bytes: stats.orphaned_bytes,
+            tracks: stats.orphaned_files,
+        });
+    }
+    Ok(slices)
+}
+
+pub(crate) async fn file_sizes(
+    state: State<'_, AppState>,
+) -> Result<std::collections::HashMap<String, u64>, AppError> {
+    let paths = repository::tracked_file_paths(&state.db).await?;
+    let mut sizes = std::collections::HashMap::with_capacity(paths.len());
+    for path in paths {
+        if path.is_empty() {
+            continue;
+        }
+        if let Ok(meta) = tokio::fs::metadata(&path).await {
+            sizes.insert(path, meta.len());
+        }
+    }
+    Ok(sizes)
 }
 
 pub(crate) async fn stats(
@@ -170,6 +238,8 @@ pub(crate) struct CachePlan {
     #[serde(default)]
     pub(crate) keep_channel_ids: Vec<String>,
     #[serde(default)]
+    pub(crate) keep_track_ids: Vec<String>,
+    #[serde(default)]
     pub(crate) drop_orphans: bool,
 }
 
@@ -199,6 +269,7 @@ pub(crate) async fn preview(
         &state.db,
         &plan.keep_playlist_ids,
         &plan.keep_channel_ids,
+        &plan.keep_track_ids,
     )
     .await?;
 
@@ -249,6 +320,7 @@ pub(crate) async fn apply(
         &state.db,
         &plan.keep_playlist_ids,
         &plan.keep_channel_ids,
+        &plan.keep_track_ids,
     )
     .await?;
 

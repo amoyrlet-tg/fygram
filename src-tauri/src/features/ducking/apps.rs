@@ -1,5 +1,3 @@
-//! The process names that count as a Telegram client.
-
 pub(crate) const KNOWN_CLIENTS: &[&str] = &[
     "telegram",
     "tdesktop",
