@@ -17,18 +17,19 @@ const EDGES = [
 export function WindowChrome() {
   const t = useT();
   const [maximized, setMaximized] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     const window = getCurrentWindow();
     let unlisten: (() => void) | undefined;
-    void window.isMaximized().then(setMaximized);
-    void window
-      .onResized(() => {
-        void window.isMaximized().then(setMaximized);
-      })
-      .then((stop) => {
-        unlisten = stop;
-      });
+    const read = () => {
+      void window.isMaximized().then(setMaximized);
+      void window.isFullscreen().then(setFullscreen);
+    };
+    read();
+    void window.onResized(read).then((stop) => {
+      unlisten = stop;
+    });
     return () => unlisten?.();
   }, []);
 
@@ -50,10 +51,14 @@ export function WindowChrome() {
         </button>
         <button
           className="window-btn"
-          onClick={() => void getCurrentWindow().toggleMaximize()}
-          aria-label={maximized ? t("Restore") : t("Maximise")}
+          onClick={() => {
+            const window = getCurrentWindow();
+            if (fullscreen) void window.setFullscreen(false);
+            else void window.toggleMaximize();
+          }}
+          aria-label={fullscreen || maximized ? t("Restore") : t("Maximise")}
         >
-          {maximized ? (
+          {fullscreen || maximized ? (
             <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
               <path
                 d="M2.6 2.6V0.9h6.5v6.5H7.4M0.9 2.6h6.5v6.5H0.9z"
@@ -86,15 +91,16 @@ export function WindowChrome() {
           </svg>
         </button>
       </div>
-      {EDGES.map((edge) => (
-        <div
-          key={edge.className}
-          className={`window-resize window-resize-${edge.className}`}
-          onMouseDown={(event) => {
-            if (event.button === 0) startResize(edge.direction);
-          }}
-        />
-      ))}
+      {!fullscreen &&
+        EDGES.map((edge) => (
+          <div
+            key={edge.className}
+            className={`window-resize window-resize-${edge.className}`}
+            onMouseDown={(event) => {
+              if (event.button === 0) startResize(edge.direction);
+            }}
+          />
+        ))}
     </>
   );
 }

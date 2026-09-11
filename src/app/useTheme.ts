@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { syncWindowBackground } from "./windowBackground";
 
 export type Theme = "light" | "dark";
 
@@ -39,7 +40,12 @@ export function useTheme(profileAccent?: string | null) {
 
   useEffect(() => {
     instantly(() => applyAccent(accent ?? profileAccent ?? null));
+    syncWindowBackground();
   }, [accent, profileAccent]);
+
+  useEffect(() => {
+    syncWindowBackground();
+  }, [theme]);
 
   const handleSetTheme = useCallback((next: Theme) => {
     instantly(() => {
@@ -47,6 +53,7 @@ export function useTheme(profileAccent?: string | null) {
     });
     localStorage.setItem("theme", next);
     setThemeState(next);
+    syncWindowBackground();
   }, []);
 
   const handleSetAccent = useCallback(

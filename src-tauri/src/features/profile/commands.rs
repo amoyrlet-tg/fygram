@@ -47,13 +47,39 @@ pub(crate) async fn detect_language() -> String {
     Box::pin(async move { service::detect_language().await }).await
 }
 
+#[cfg(target_os = "windows")]
+static RESTORE_MAXIMIZED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(target_os = "windows")]
+fn apply_fullscreen(window: &tauri::WebviewWindow, on: bool) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+
+    if on {
+        let was_maximized = window.is_maximized().map_err(|e| e.to_string())?;
+        RESTORE_MAXIMIZED.store(was_maximized, Ordering::Relaxed);
+        if was_maximized {
+            window.unmaximize().map_err(|e| e.to_string())?;
+        }
+        window.set_fullscreen(true).map_err(|e| e.to_string())?;
+    } else {
+        window.set_fullscreen(false).map_err(|e| e.to_string())?;
+        if RESTORE_MAXIMIZED.swap(false, Ordering::Relaxed) {
+            window.maximize().map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn apply_fullscreen(window: &tauri::WebviewWindow, on: bool) -> Result<(), String> {
+    window.set_fullscreen(on).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub(crate) fn toggle_fullscreen(app: AppHandle) -> Result<bool, String> {
     let window = app.get_webview_window("main").ok_or("no main window")?;
     let is_fullscreen = window.is_fullscreen().map_err(|e| e.to_string())?;
-    window
-        .set_fullscreen(!is_fullscreen)
-        .map_err(|e| e.to_string())?;
+    apply_fullscreen(&window, !is_fullscreen)?;
     Ok(!is_fullscreen)
 }
 
