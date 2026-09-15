@@ -1,0 +1,49 @@
+name: Publish Release from Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Run ID с готовыми artifacts"
+        required: true
+      tag:
+        description: "Тег релиза"
+        required: true
+        default: "1.0"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download all artifacts from existing run
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.inputs.run_id }}
+          pattern: fygram-*
+          path: ./release-files
+
+      - name: Collect only real installers
+        run: |
+          mkdir -p ./flat
+          find ./release-files -type f \( \
+            -name "*.exe" -o \
+            -name "*.msi" -o \
+            -name "*.deb" -o \
+            -name "*.AppImage" -o \
+            -name "*.dmg" -o \
+            -name "*.tar.gz" -o \
+            -name "fygram-arch-x86_64" \
+          \) -exec cp {} ./flat/ \;
+          ls -la ./flat
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          files: ./flat/*
+          fail_on_unmatched_files: true
+          draft: false

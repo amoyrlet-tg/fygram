@@ -1,0 +1,287 @@
+.settings-body.storage-page {
+  padding: 16px 20px 20px;
+  gap: 16px;
+}
+.storage-page .storage-overview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 88px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/*
+ * The duck only shows while a cleanup runs. It takes its width from nothing and gives
+ * it back the same way, so the row keeps its height and the figures beside it slide
+ * rather than jump. The slot clips; the artwork inside does the scaling.
+ */
+.storage-duck {
+  --duck-in: 460ms;
+  --duck-out: 340ms;
+  flex: 0 0 auto;
+  overflow: hidden;
+  animation: duck-slot-in var(--duck-in) var(--ease-out) both;
+}
+.storage-duck.is-leaving {
+  animation: duck-slot-out var(--duck-out) var(--ease-productive) both;
+}
+.storage-duck-art {
+  animation: duck-art-in var(--duck-in) var(--ease-out) both;
+}
+.storage-duck.is-leaving .storage-duck-art {
+  animation: duck-art-out var(--duck-out) var(--ease-productive) both;
+}
+@keyframes duck-slot-in {
+  from {
+    width: 0;
+    margin-right: -14px;
+  }
+  to {
+    width: 88px;
+    margin-right: 0;
+  }
+}
+@keyframes duck-slot-out {
+  from {
+    width: 88px;
+    margin-right: 0;
+  }
+  to {
+    width: 0;
+    margin-right: -14px;
+  }
+}
+@keyframes duck-art-in {
+  from {
+    opacity: 0;
+    transform: scale(0.62) rotate(-10deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes duck-art-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.62) rotate(10deg);
+  }
+}
+.storage-overview-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.storage-page .storage-overview strong {
+  color: var(--text);
+  font-size: 32px;
+  font-weight: 650;
+  line-height: 1.2;
+  animation: storage-size-in 320ms var(--ease-out) both;
+}
+@keyframes storage-size-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.storage-page .storage-clear {
+  position: relative;
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Cleaning leaves the button disabled, so it carries the work instead of looking dead. */
+.storage-page .storage-clear.is-working {
+  opacity: 1;
+}
+.storage-page .storage-clear.is-working::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 22%, rgb(255 255 255 / 22%) 50%, transparent 78%);
+  animation: storage-clear-sweep 1.4s linear infinite;
+}
+@keyframes storage-clear-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.cache-age {
+  padding: 15px 18px 13px;
+  border-radius: var(--settings-radius, var(--radius-md));
+  background: var(--bg-elevated-2);
+}
+.cache-age.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.cache-age-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cache-age-note {
+  margin: 4px 0 14px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-faint);
+}
+.cache-age-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.cache-age-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-base);
+}
+
+.cache-age-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 20px;
+}
+.cache-age-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--slider-track-bg);
+}
+.cache-age-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--pct);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-base) 55%, white) 0%,
+    var(--accent-base) 100%
+  );
+  transition: width var(--duration-base) var(--ease-out);
+}
+.cache-age-tick {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: color-mix(in srgb, var(--text) 40%, transparent);
+  transition: background var(--duration-short) var(--ease-out);
+}
+.cache-age-tick.is-filled {
+  background: color-mix(in srgb, white 75%, transparent);
+}
+.cache-age-knob {
+  position: absolute;
+  top: 50%;
+  left: var(--pct);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  box-shadow:
+    0 1px 5px rgb(0 0 0 / 35%),
+    0 0 0 1px color-mix(in srgb, var(--accent-base) 45%, transparent);
+  transform: translate(-50%, -50%);
+  transition:
+    left var(--duration-base) var(--ease-out),
+    transform var(--duration-short) var(--ease-out),
+    box-shadow var(--duration-short) var(--ease-out);
+}
+.cache-age-control:hover .cache-age-knob {
+  transform: translate(-50%, -50%) scale(1.14);
+}
+.cache-age-control:active .cache-age-knob {
+  transform: translate(-50%, -50%) scale(1.22);
+  box-shadow:
+    0 2px 8px rgb(0 0 0 / 40%),
+    0 0 0 6px color-mix(in srgb, var(--accent-base) 22%, transparent);
+}
+.cache-age-control:has(.cache-age-input:focus-visible) .cache-age-knob {
+  box-shadow:
+    0 1px 5px rgb(0 0 0 / 35%),
+    0 0 0 5px color-mix(in srgb, var(--accent-base) 35%, transparent);
+}
+
+/* The native range keeps keyboard and pointer behaviour; the painted parts above it are the visible slider. */
+.cache-age-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+}
+.cache-age-input:disabled {
+  cursor: default;
+}
+.cache-age-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+}
+.cache-age-input::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: none;
+}
+
+.cache-age-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 9px;
+}
+.cache-age-mark {
+  padding: 2px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--duration-short) var(--ease-out),
+    background var(--duration-short) var(--ease-out);
+}
+.cache-age-mark:first-child {
+  margin-left: -6px;
+}
+.cache-age-mark:last-child {
+  margin-right: -6px;
+}
+.cache-age-mark:hover {
+  color: var(--text-dim);
+  background: var(--bg-hover);
+}
+.cache-age-mark.is-active {
+  color: var(--accent-base);
+}

@@ -1,0 +1,407 @@
+use chrono::{Duration as ChronoDuration, Utc};
+use tauri::{AppHandle, Emitter, State};
+
+use crate::shared::error::AppError;
+use crate::shared::media_paths;
+use crate::AppState;
+
+use super::repository;
+
+const PART_FILE_GRACE: std::time::Duration = std::time::Duration::from_secs(600);
+pub(crate) const CACHE_MAX_AGE_KEY: &str = "cache_max_age_days";
+pub(crate) const DEFAULT_CACHE_MAX_AGE_DAYS: i64 = 30;
+
+pub(crate) async fn cache_max_age_days(db: &sqlx::SqlitePool) -> Result<i64, AppError> {
+    let value = crate::shared::settings::get(db, CACHE_MAX_AGE_KEY).await?;
+    Ok(value
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(DEFAULT_CACHE_MAX_AGE_DAYS)
+        .max(0))
+}
+
+pub(crate) async fn set_cache_max_age(db: &sqlx::SqlitePool, days: i64) -> Result<(), AppError> {
+    crate::shared::settings::set(db, CACHE_MAX_AGE_KEY, &days.max(0).to_string()).await
+}
+
+async fn is_online(state: &State<'_, AppState>) -> bool {
+    let status = state.sync.snapshot().await;
+    status.ready && status.online
+}
+
+async fn eviction_cutoff(db: &sqlx::SqlitePool) -> Result<Option<String>, AppError> {
+    let days = cache_max_age_days(db).await?;
+    if days == 0 {
+        return Ok(None);
+    }
+    Ok(Some(
+        (Utc::now() - ChronoDuration::days(days))
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string(),
+    ))
+}
+
+pub(crate) async fn aged_out_files(db: &sqlx::SqlitePool) -> Result<Vec<String>, AppError> {
+    let Some(cutoff) = eviction_cutoff(db).await? else {
+        return Ok(Vec::new());
+    };
+    Ok(repository::eviction_candidates(db, Some(&cutoff))
+        .await?
+        .into_iter()
+        .map(|row| row.file_path)
+        .collect())
+}
+
+async fn scan_media_files(
+    root: &std::path::Path,
+    active_channel_ids: &std::collections::HashSet<String>,
+) -> Vec<std::path::PathBuf> {
+    let mut out = media_paths::walk_audio_files(root).await;
+    for path in media_paths::stale_incoming_files(root, PART_FILE_GRACE).await {
+        let channel = path
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if !active_channel_ids.contains(&channel) {
+            out.push(path);
+        }
+    }
+    out
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct CacheStats {
+    pub(crate) total_bytes: u64,
+    pub(crate) track_count: u32,
+
+    pub(crate) orphaned_bytes: u64,
+    pub(crate) orphaned_files: u32,
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct StorageSlice {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) avatar_path: Option<String>,
+    pub(crate) bytes: u64,
+    pub(crate) tracks: u32,
+}
+
+pub(crate) async fn breakdown(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Vec<StorageSlice>, AppError> {
+    let owned = repository::files_by_channel(&state.db).await?;
+
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    let mut by_channel: std::collections::HashMap<&str, StorageSlice> =
+        std::collections::HashMap::new();
+    for file in &owned {
+        if !seen.insert(file.file_path.as_str()) {
+            continue;
+        }
+        let Ok(meta) = tokio::fs::metadata(&file.file_path).await else {
+            continue;
+        };
+        let slice = by_channel
+            .entry(file.channel_id.as_str())
+            .or_insert_with(|| StorageSlice {
+                id: file.channel_id.clone(),
+                title: file.title.clone(),
+                avatar_path: file.avatar_path.clone(),
+                bytes: 0,
+                tracks: 0,
+            });
+        slice.bytes += meta.len();
+        slice.tracks += 1;
+    }
+
+    let mut slices: Vec<StorageSlice> = by_channel.into_values().collect();
+    slices.sort_by_key(|slice| std::cmp::Reverse(slice.bytes));
+
+    let stats = stats(state, app).await?;
+    if stats.orphaned_bytes > 0 {
+        slices.push(StorageSlice {
+            id: String::new(),
+            title: String::new(),
+            avatar_path: None,
+            bytes: stats.orphaned_bytes,
+            tracks: stats.orphaned_files,
+        });
+    }
+    Ok(slices)
+}
+
+pub(crate) async fn file_sizes(
+    state: State<'_, AppState>,
+) -> Result<std::collections::HashMap<String, u64>, AppError> {
+    let paths = repository::tracked_file_paths(&state.db).await?;
+    let mut sizes = std::collections::HashMap::with_capacity(paths.len());
+    for path in paths {
+        if path.is_empty() {
+            continue;
+        }
+        if let Ok(meta) = tokio::fs::metadata(&path).await {
+            sizes.insert(path, meta.len());
+        }
+    }
+    Ok(sizes)
+}
+
+pub(crate) async fn stats(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<CacheStats, AppError> {
+    let dir = media_paths::media_root(&app, &state.db)
+        .await
+        .map_err(|err| AppError::Msg(err.to_string()))?;
+    let tracked = repository::tracked_file_paths(&state.db).await?;
+
+    let mut total_bytes = 0u64;
+    let mut track_count = 0u32;
+    for path in &tracked {
+        if let Ok(meta) = tokio::fs::metadata(path).await {
+            total_bytes += meta.len();
+            track_count += 1;
+        }
+    }
+
+    let active_channel_ids: std::collections::HashSet<String> = state
+        .sync_cancel_flags
+        .lock()
+        .await
+        .keys()
+        .cloned()
+        .collect();
+    let mut orphaned_bytes = 0u64;
+    let mut orphaned_files = 0u32;
+    for path in scan_media_files(&dir, &active_channel_ids).await {
+        if tracked.contains(&path.to_string_lossy().to_string()) {
+            continue;
+        }
+        if let Ok(meta) = tokio::fs::metadata(&path).await {
+            orphaned_bytes += meta.len();
+            orphaned_files += 1;
+        }
+    }
+
+    Ok(CacheStats {
+        total_bytes,
+        track_count,
+        orphaned_bytes,
+        orphaned_files,
+    })
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct CacheCleanupResult {
+    pub(crate) freed_bytes: u64,
+    pub(crate) deleted_orphan_files: u32,
+    pub(crate) evicted_tracks: u32,
+}
+
+pub(crate) async fn cleanup(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    target_bytes: u64,
+) -> Result<CacheCleanupResult, AppError> {
+    if !is_online(&state).await {
+        return Err(AppError::Msg(
+            "cache cleanup is unavailable while the device is offline".to_string(),
+        ));
+    }
+    let dir = media_paths::media_root(&app, &state.db)
+        .await
+        .map_err(|err| AppError::Msg(err.to_string()))?;
+    let tracked = repository::tracked_file_paths(&state.db).await?;
+
+    let active_channel_ids: std::collections::HashSet<String> = state
+        .sync_cancel_flags
+        .lock()
+        .await
+        .keys()
+        .cloned()
+        .collect();
+    let mut freed_bytes = 0u64;
+    let mut deleted_orphan_files = 0u32;
+
+    for path in scan_media_files(&dir, &active_channel_ids).await {
+        if tracked.contains(&path.to_string_lossy().to_string()) {
+            continue;
+        }
+        if let Ok(meta) = tokio::fs::metadata(&path).await {
+            if tokio::fs::remove_file(&path).await.is_ok() {
+                freed_bytes += meta.len();
+                deleted_orphan_files += 1;
+            }
+        }
+    }
+
+    let mut evicted_tracks = 0u32;
+
+    if freed_bytes < target_bytes {
+        let remaining = target_bytes - freed_bytes;
+        let cutoff = eviction_cutoff(&state.db).await?;
+        let rows = repository::eviction_candidates(&state.db, cutoff.as_deref()).await?;
+        let current_playing = state.player.current_path();
+
+        let mut freed_from_tracks = 0u64;
+        for row in rows {
+            if freed_from_tracks >= remaining {
+                break;
+            }
+            if current_playing
+                .as_deref()
+                .is_some_and(|p| p.as_os_str() == std::ffi::OsStr::new(&row.file_path))
+            {
+                continue;
+            }
+            let Ok(meta) = tokio::fs::metadata(&row.file_path).await else {
+                continue;
+            };
+            let size = meta.len();
+
+            evicted_tracks += repository::evict_file(&state.db, &row.file_path).await? as u32;
+
+            if tokio::fs::remove_file(&row.file_path).await.is_ok() {
+                freed_from_tracks += size;
+                freed_bytes += size;
+            }
+        }
+    }
+
+    let _ = app.emit("library-changed", ());
+
+    Ok(CacheCleanupResult {
+        freed_bytes,
+        deleted_orphan_files,
+        evicted_tracks,
+    })
+}
+
+#[derive(Debug, Default, serde::Serialize)]
+pub(crate) struct CachePreview {
+    pub(crate) keep_bytes: u64,
+    pub(crate) keep_tracks: u32,
+    pub(crate) free_bytes: u64,
+    pub(crate) free_tracks: u32,
+    pub(crate) orphan_bytes: u64,
+    pub(crate) orphan_files: u32,
+}
+
+async fn size_of(path: &str) -> Option<u64> {
+    tokio::fs::metadata(path).await.ok().map(|m| m.len())
+}
+
+pub(crate) async fn preview(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<CachePreview, AppError> {
+    let root = media_paths::media_root(&app, &state.db)
+        .await
+        .map_err(|err| AppError::Msg(err.to_string()))?;
+    let tracked = repository::tracked_file_paths(&state.db).await?;
+
+    let mut preview = CachePreview::default();
+    let current_playing = state.player.current_path();
+    for path in tracked.iter().filter(|path| !path.is_empty()) {
+        let Some(size) = size_of(path).await else {
+            continue;
+        };
+        if current_playing
+            .as_deref()
+            .is_some_and(|p| p.as_os_str() == std::ffi::OsStr::new(path))
+        {
+            preview.keep_bytes += size;
+            preview.keep_tracks += 1;
+        } else {
+            preview.free_bytes += size;
+            preview.free_tracks += 1;
+        }
+    }
+
+    let active: std::collections::HashSet<String> = state
+        .sync_cancel_flags
+        .lock()
+        .await
+        .keys()
+        .cloned()
+        .collect();
+    for path in scan_media_files(&root, &active).await {
+        if tracked.contains(&path.to_string_lossy().to_string()) {
+            continue;
+        }
+        if let Ok(meta) = tokio::fs::metadata(&path).await {
+            preview.orphan_bytes += meta.len();
+            preview.orphan_files += 1;
+        }
+    }
+
+    Ok(preview)
+}
+
+pub(crate) async fn apply(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<CacheCleanupResult, AppError> {
+    let root = media_paths::media_root(&app, &state.db)
+        .await
+        .map_err(|err| AppError::Msg(err.to_string()))?;
+    let removable: Vec<String> = repository::tracked_file_paths(&state.db)
+        .await?
+        .into_iter()
+        .filter(|path| !path.is_empty())
+        .collect();
+
+    let current_playing = state.player.current_path();
+    let mut freed_bytes = 0u64;
+    let mut evicted_tracks = 0u32;
+
+    for path in removable {
+        if current_playing
+            .as_deref()
+            .is_some_and(|p| p.as_os_str() == std::ffi::OsStr::new(&path))
+        {
+            continue;
+        }
+        let size = size_of(&path).await.unwrap_or(0);
+        evicted_tracks += repository::evict_file(&state.db, &path).await? as u32;
+        if tokio::fs::remove_file(&path).await.is_ok() {
+            freed_bytes += size;
+        }
+    }
+
+    let mut deleted_orphan_files = 0u32;
+    {
+        let tracked = repository::tracked_file_paths(&state.db).await?;
+        let active: std::collections::HashSet<String> = state
+            .sync_cancel_flags
+            .lock()
+            .await
+            .keys()
+            .cloned()
+            .collect();
+        for path in scan_media_files(&root, &active).await {
+            if tracked.contains(&path.to_string_lossy().to_string()) {
+                continue;
+            }
+            if let Ok(meta) = tokio::fs::metadata(&path).await {
+                if tokio::fs::remove_file(&path).await.is_ok() {
+                    freed_bytes += meta.len();
+                    deleted_orphan_files += 1;
+                }
+            }
+        }
+    }
+
+    media_paths::prune_empty_dirs(&root).await;
+
+    let _ = app.emit("library-changed", ());
+
+    Ok(CacheCleanupResult {
+        freed_bytes,
+        deleted_orphan_files,
+        evicted_tracks,
+    })
+}

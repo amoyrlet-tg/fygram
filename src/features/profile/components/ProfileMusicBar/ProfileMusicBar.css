@@ -1,0 +1,100 @@
+.profile-music-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.24);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.profile-music-bar:hover {
+  background: rgba(0, 0, 0, 0.34);
+}
+
+.profile-music-window {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+/* Names that fit stay crisp; only a travelling lane needs its edges softened. */
+.profile-music-window.is-travelling {
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    #000 14px,
+    #000 calc(100% - 14px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    #000 14px,
+    #000 calc(100% - 14px),
+    transparent 100%
+  );
+}
+
+.profile-music-run {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--repeat-gap, 28px);
+  white-space: nowrap;
+}
+.profile-music-lane {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 18px;
+}
+
+.profile-music-run.is-travelling {
+  animation-name: profile-music-travel;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+/*
+ * The travel carries content, it is not decoration: with the desktop's animations off
+ * (WebKitGTK then reports prefers-reduced-motion: reduce) a name wider than the bar
+ * would simply be unreadable. So it keeps running, and the pointer or the keyboard can
+ * stop it instead.
+ */
+.profile-music-bar:hover .profile-music-run.is-travelling,
+.profile-music-bar:focus-visible .profile-music-run.is-travelling {
+  animation-play-state: paused;
+}
+/* One copy plus the gap: the repeat lands exactly where the first copy started. */
+@keyframes profile-music-travel {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(var(--travel) * -1));
+  }
+}
+.profile-music-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  opacity: 0.95;
+}
+.profile-music-title {
+  font-weight: 600;
+}
+.profile-music-artist {
+  opacity: 0.7;
+}
+.profile-music-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  opacity: 0.8;
+}

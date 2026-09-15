@@ -1,0 +1,456 @@
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: var(--scrim);
+
+  backdrop-filter: blur(var(--scrim-blur));
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
+}
+.settings-backdrop.is-entering {
+  animation: settings-backdrop-in 0.28s var(--ease-productive) both;
+}
+.settings-backdrop.is-closing {
+  animation: settings-backdrop-out 0.2s var(--ease-productive) both;
+}
+@keyframes settings-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes settings-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.settings-dialog {
+  --settings-motion: 420ms;
+  --settings-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  z-index: 121;
+  width: min(420px, calc(100vw - 32px));
+  height: fit-content;
+  transition: width var(--settings-motion) var(--settings-ease);
+  max-height: calc(100vh - 64px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--bg-elevated);
+  border-radius: 22px;
+  box-shadow:
+    0 24px 80px rgb(0 0 0 / 28%),
+    0 4px 16px rgb(0 0 0 / 14%),
+    0 0 0 1px var(--glass-inset);
+  overflow: hidden;
+  will-change: transform, opacity;
+}
+/* The storage page carries far less than the root page, so the dialog narrows with it. */
+.settings-dialog.is-storage {
+  width: min(348px, calc(100vw - 32px));
+}
+/*
+ * Only while entering. Left on the element for good, the rule replays the whole
+ * animation whenever anything else changes what animations are allowed - switching eco
+ * mode off did exactly that, and the open dialog blinked shut and open again.
+ */
+.settings-dialog.is-entering {
+  animation: settings-in 0.28s var(--ease-out) both;
+}
+.settings-dialog.is-closing {
+  animation: settings-out 0.2s var(--ease-productive) both;
+}
+@keyframes settings-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes settings-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  flex: 0 0 auto;
+
+  background: color-mix(in srgb, #000 14%, var(--bg-elevated));
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 0;
+  height: 30px;
+  margin-right: -12px;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  transition:
+    width var(--settings-motion) var(--settings-ease),
+    margin-right var(--settings-motion) var(--settings-ease),
+    opacity 180ms ease,
+    transform var(--settings-motion) var(--settings-ease);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.settings-head.is-storage .settings-back {
+  width: 30px;
+  margin-right: 2px;
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.settings-back svg {
+  flex-shrink: 0;
+}
+.settings-back:hover {
+  background: var(--bg-hover);
+}
+
+.settings-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.settings-close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.settings-dialog .settings-pane-storage {
+  background: var(--bg-elevated);
+}
+.settings-title {
+  flex: 0 1 auto;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Overlapping pages move at different speeds, keeping navigation spatially clear. */
+.settings-pages {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  transition: height var(--settings-motion) var(--settings-ease);
+}
+
+.settings-track {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+  isolation: isolate;
+}
+.settings-pane {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  transform: translateX(0) scale(1);
+  opacity: 1;
+  transform-origin: left center;
+}
+.settings-pane-storage {
+  z-index: 1;
+}
+.settings-pane[hidden] {
+  display: none;
+}
+.settings-track.is-sliding .settings-pane {
+  transition:
+    transform var(--settings-motion) var(--settings-ease),
+    opacity var(--settings-motion) var(--settings-ease);
+  will-change: transform, opacity;
+}
+.settings-track.is-sliding .settings-pane-root[aria-hidden="true"] {
+  transform: translateX(-18%);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.settings-track.is-sliding .settings-pane-storage[aria-hidden="true"] {
+  transform: translateX(100%);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.settings-title-storage {
+  animation: settings-title-forward var(--settings-motion) var(--settings-ease);
+}
+.settings-title-root {
+  animation: settings-title-back var(--settings-motion) var(--settings-ease);
+}
+@keyframes settings-title-forward {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes settings-title-back {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 8px;
+  min-height: 0;
+  padding: 0 10px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+/* Keep content at its natural height so Chromium scrolls instead of shrinking it. */
+.settings-body > * {
+  flex-shrink: 0;
+}
+
+.settings-list {
+  --settings-radius: 18px;
+  --settings-radius-inner: 6px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settings-group > * {
+  border-radius: var(--settings-radius-inner);
+}
+.settings-group > :first-child {
+  border-top-left-radius: var(--settings-radius);
+  border-top-right-radius: var(--settings-radius);
+}
+.settings-group > :last-child {
+  border-bottom-left-radius: var(--settings-radius);
+  border-bottom-right-radius: var(--settings-radius);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 11px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 22px 8px 17px;
+  border: none;
+  background: var(--bg-elevated-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.settings-row.is-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 22px 14px 17px;
+}
+
+.settings-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+
+  gap: 0;
+  min-width: 0;
+
+  padding-right: 4px;
+}
+.settings-row-title {
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.settings-row-note {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-faint);
+}
+
+label.settings-row {
+  cursor: pointer;
+}
+label.settings-row:hover,
+.settings-link:hover {
+  background: var(--bg-hover);
+}
+.settings-row.is-disabled {
+  cursor: default;
+}
+.settings-row.is-disabled:hover {
+  background: var(--bg-elevated-2);
+}
+.settings-row.is-disabled .settings-row-title {
+  color: var(--text-faint);
+}
+
+.settings-link {
+  cursor: pointer;
+}
+/*
+ * A child of the row above it. The empty icon slot already lines its title up with the
+ * parent's, so all it needs is a tick in that slot to say where it belongs.
+ */
+.settings-row.is-nested {
+  min-height: 46px;
+}
+.settings-row.is-nested .settings-row-title {
+  color: var(--text-dim);
+}
+.settings-row.is-nested .settings-row-icon {
+  color: var(--text-faint);
+}
+
+.settings-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+
+  width: 40px;
+  height: 40px;
+  color: var(--text-dim);
+}
+.settings-link:hover .settings-row-icon {
+  color: var(--text);
+}
+.settings-row-chevron {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+.settings-link.is-danger .settings-row-title {
+  color: var(--danger);
+}
+.settings-link.is-danger .settings-row-icon {
+  color: var(--danger);
+}
+.settings-link.is-danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.settings-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-yellow) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
+}
+.settings-alert-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.settings-alert-text strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.settings-alert-text span {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-faint);
+}
+.settings-alert-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.settings-appearance,
+.settings-language {
+  background: transparent;
+}
+.settings-appearance:hover,
+.settings-language:hover {
+  background: transparent;
+}
+.settings-appearance {
+  gap: 14px;
+  padding: 4px 4px 14px;
+}
+.settings-heading {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--accent-base, var(--blue));
+}
+
+.settings-language {
+  justify-content: space-between;
+  padding: 8px 4px;
+  min-height: 44px;
+}
+
+.settings-group + .settings-group::before {
+  content: "";
+  display: block;
+  height: 10px;
+  margin: 0 -10px 14px;
+  background: var(--divider);
+}

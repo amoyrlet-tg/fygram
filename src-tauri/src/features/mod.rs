@@ -1,0 +1,11 @@
+pub(crate) mod auth;
+pub(crate) mod cloud;
+pub(crate) mod diagnostics;
+pub(crate) mod ducking;
+pub(crate) mod library;
+pub(crate) mod lyrics;
+pub(crate) mod playback;
+pub(crate) mod playlists;
+pub(crate) mod profile;
+pub(crate) mod storage;
+pub(crate) mod sync;

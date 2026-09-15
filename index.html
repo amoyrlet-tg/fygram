@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>fygram</title>
+    <link rel="stylesheet" href="/src/app/styles/boot.css" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          if (t !== "light" && t !== "dark") {
+            t = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+          }
+          document.documentElement.dataset.theme = t;
+
+          var accent =
+            localStorage.getItem("accentColor") || localStorage.getItem("profileAccentColor");
+          if (accent) {
+            var resolved = accent.toLowerCase() === "#ffffff" ? "#9e9e9e" : accent;
+            document.documentElement.style.setProperty("--accent-base", resolved);
+          }
+          document.documentElement.toggleAttribute(
+            "data-eco",
+            localStorage.getItem("ecoMode") === "1",
+          );
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+
+  <body>
+    <div id="root">
+      <div class="boot-screen" aria-busy="true">
+        <div class="boot-brand">fygram</div>
+        <div class="boot-progress" aria-hidden="true"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

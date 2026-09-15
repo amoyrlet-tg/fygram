@@ -1,0 +1,60 @@
+.language-picker-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+}
+
+.language-picker-caption {
+  font-size: 13px;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
+
+.language-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 160px);
+  gap: 14px;
+}
+
+.language-picker-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px;
+  background: var(--bg-elevated-2);
+  border: none;
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.language-picker-option:hover {
+  background: var(--bg-hover);
+}
+
+.language-picker-option.is-suggested {
+  background: color-mix(in srgb, var(--accent-base) 16%, var(--bg-elevated-2));
+}
+
+.language-picker-flag {
+  width: 40px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+@media (max-width: 420px) {
+  .language-picker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: calc(100% - 48px);
+    max-width: 340px;
+  }
+}

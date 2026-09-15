@@ -1,0 +1,79 @@
+.audio-output {
+  position: relative;
+}
+
+.audio-output-trigger {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--accent-base);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.audio-output-trigger:hover {
+  background: color-mix(in srgb, var(--accent-base) 14%, transparent);
+}
+
+.audio-output-menu {
+  position: fixed;
+  z-index: 200;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-base) 18%, var(--bg-elevated-2));
+  animation: audio-output-in 0.14s var(--ease-productive) both;
+}
+@keyframes audio-output-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.audio-output-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--corner-radius-base);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.audio-output-option:hover {
+  background: var(--bg-hover);
+}
+.audio-output-option.is-active {
+  color: var(--accent-base);
+}
+.audio-output-option > span {
+  flex: 1;
+  min-width: 0;
+}
+.audio-output-option > svg {
+  flex: 0 0 auto;
+}
+
+.audio-output-empty {
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}

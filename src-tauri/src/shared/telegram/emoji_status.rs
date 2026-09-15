@@ -1,0 +1,202 @@
+use std::collections::HashMap;
+use std::io::Read;
+use std::path::Path;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use anyhow::{Context, Result};
+use grammers_client::media::Document;
+use grammers_client::{tl, Client};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum EmojiStatusKind {
+    Lottie,
+    Video,
+    Image,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct EmojiStatus {
+    pub(crate) path: String,
+    pub(crate) kind: EmojiStatusKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct Collectible {
+    pub(crate) pattern_document_id: i64,
+    pub(crate) center: String,
+    pub(crate) edge: String,
+    pub(crate) pattern: String,
+    pub(crate) text: String,
+}
+
+pub(crate) fn collectible(user: &tl::enums::User) -> Option<Collectible> {
+    let tl::enums::User::User(user) = user else {
+        return None;
+    };
+    match user.emoji_status.as_ref()? {
+        tl::enums::EmojiStatus::Collectible(status) => Some(Collectible {
+            pattern_document_id: status.pattern_document_id,
+            center: hex(status.center_color),
+            edge: hex(status.edge_color),
+            pattern: hex(status.pattern_color),
+            text: hex(status.text_color),
+        }),
+        _ => None,
+    }
+}
+
+fn hex(colour: i32) -> String {
+    format!("#{:06x}", colour & 0x00ff_ffff)
+}
+
+pub(crate) fn status_document_id(user: &tl::enums::User) -> Option<i64> {
+    let tl::enums::User::User(user) = user else {
+        return None;
+    };
+    match user.emoji_status.as_ref()? {
+        tl::enums::EmojiStatus::Status(status) => Some(status.document_id),
+        tl::enums::EmojiStatus::Collectible(status) => Some(status.document_id),
+        _ => None,
+    }
+}
+
+async fn cached(dir: &Path, document_id: i64) -> Option<EmojiStatus> {
+    let prefix = format!("avatar_status_{document_id}.");
+    let mut entries = tokio::fs::read_dir(dir).await.ok()?;
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let name = entry.file_name();
+        let Some(extension) = name
+            .to_string_lossy()
+            .strip_prefix(&prefix)
+            .map(str::to_owned)
+        else {
+            continue;
+        };
+        let kind = match extension.as_str() {
+            "json" => EmojiStatusKind::Lottie,
+            "webm" => EmojiStatusKind::Video,
+            _ => EmojiStatusKind::Image,
+        };
+        return Some(EmojiStatus {
+            path: entry.path().to_string_lossy().into_owned(),
+            kind,
+        });
+    }
+    None
+}
+
+const RETRY_AFTER: Duration = Duration::from_secs(600);
+
+fn refused() -> &'static Mutex<HashMap<i64, Instant>> {
+    static CELL: OnceLock<Mutex<HashMap<i64, Instant>>> = OnceLock::new();
+    CELL.get_or_init(Default::default)
+}
+
+pub(crate) async fn fetch(client: &Client, dir: &Path, document_id: i64) -> Result<EmojiStatus> {
+    if let Some(hit) = cached(dir, document_id).await {
+        return Ok(hit);
+    }
+
+    if let Ok(seen) = refused().lock() {
+        if let Some(at) = seen.get(&document_id) {
+            if at.elapsed() < RETRY_AFTER {
+                anyhow::bail!(
+                    "skipped, this document refused to download {}s ago",
+                    at.elapsed().as_secs()
+                );
+            }
+        }
+    }
+
+    match download(client, dir, document_id).await {
+        Ok(status) => {
+            if let Ok(mut seen) = refused().lock() {
+                seen.remove(&document_id);
+            }
+            Ok(status)
+        }
+        Err(err) => {
+            if let Ok(mut seen) = refused().lock() {
+                seen.insert(document_id, Instant::now());
+            }
+            Err(err)
+        }
+    }
+}
+
+async fn download(client: &Client, dir: &Path, document_id: i64) -> Result<EmojiStatus> {
+    let documents = client
+        .invoke(&tl::functions::messages::GetCustomEmojiDocuments {
+            document_id: vec![document_id],
+        })
+        .await
+        .context("asking Telegram for the emoji status document")?;
+
+    let raw = documents
+        .into_iter()
+        .find(|d| matches!(d, tl::enums::Document::Document(_)))
+        .context("Telegram returned no document for this emoji status")?;
+
+    let mime = match &raw {
+        tl::enums::Document::Document(d) => d.mime_type.clone(),
+        tl::enums::Document::Empty(_) => String::new(),
+    };
+    let (kind, extension) = match mime.as_str() {
+        "application/x-tgsticker" => (EmojiStatusKind::Lottie, "json"),
+        "video/webm" => (EmojiStatusKind::Video, "webm"),
+        _ => (EmojiStatusKind::Image, "webp"),
+    };
+
+    let path = dir.join(format!("avatar_status_{document_id}.{extension}"));
+    if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+        return Ok(EmojiStatus {
+            path: path.to_string_lossy().into_owned(),
+            kind,
+        });
+    }
+
+    let document = Document::from_raw_media(tl::types::MessageMediaDocument {
+        nopremium: false,
+        spoiler: false,
+        video: false,
+        round: false,
+        voice: false,
+        document: Some(raw),
+        alt_documents: None,
+        video_cover: None,
+        video_timestamp: None,
+        ttl_seconds: None,
+    });
+
+    let mut bytes = Vec::new();
+    let mut download = client.iter_download(&document);
+    while let Some(chunk) = download
+        .next()
+        .await
+        .context("downloading the emoji status document")?
+    {
+        bytes.extend_from_slice(&chunk);
+    }
+
+    if matches!(kind, EmojiStatusKind::Lottie) {
+        bytes = unpack_lottie(&bytes).context("unpacking the emoji status animation")?;
+    }
+
+    crate::shared::atomic_file::atomic_write_async(&path, &bytes)
+        .await
+        .context("writing the emoji status file")?;
+
+    Ok(EmojiStatus {
+        path: path.to_string_lossy().into_owned(),
+        kind,
+    })
+}
+
+fn unpack_lottie(gzipped: &[u8]) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
+    flate2::read::GzDecoder::new(gzipped).read_to_end(&mut out)?;
+    Ok(out)
+}

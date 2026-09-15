@@ -1,0 +1,110 @@
+.window-controls {
+  position: fixed;
+
+  top: var(--panel-gap);
+
+  right: var(--panel-gap);
+
+  z-index: 1100;
+  height: var(--window-controls-height);
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: 0 var(--radius-lg) 0 var(--radius-md);
+  background: color-mix(in srgb, var(--bg-elevated) 92%, var(--bg));
+  user-select: none;
+  -webkit-user-select: none;
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .window-controls {
+    background: color-mix(in srgb, var(--bg-elevated) 62%, transparent);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+  }
+}
+
+.window-btn {
+  width: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.window-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.window-btn:active {
+  background: var(--bg-elevated-2);
+}
+.window-btn-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+.window-btn-close:active {
+  background: #a52318;
+}
+
+.window-resize {
+  position: fixed;
+  z-index: 61;
+}
+.window-resize-n {
+  top: 0;
+  left: 6px;
+  right: 6px;
+  height: 4px;
+  cursor: ns-resize;
+}
+.window-resize-s {
+  bottom: 0;
+  left: 6px;
+  right: 6px;
+  height: 4px;
+  cursor: ns-resize;
+}
+.window-resize-w {
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 4px;
+  cursor: ew-resize;
+}
+.window-resize-e {
+  top: 6px;
+  bottom: 6px;
+  right: 0;
+  width: 4px;
+  cursor: ew-resize;
+}
+.window-resize-nw,
+.window-resize-ne,
+.window-resize-sw,
+.window-resize-se {
+  width: 8px;
+  height: 8px;
+}
+.window-resize-nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+.window-resize-ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+.window-resize-sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+.window-resize-se {
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+}
